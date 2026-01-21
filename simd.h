@@ -27,13 +27,13 @@
 #ifdef AVX512_CORE
 #endif
 
-#define align( x ) (__attribute__((aligned(x))))
 
-typedef union Vec2f32{
-	struct{f32 s[2];};
-	struct{f32 x,y;};
-	struct{f32 a,b;};
-}Vec2f32;
+#include "f32x2.h"
+#include "f64x2.h"
+
+#include "f32x2.c"
+#include "f64x2.c"
+
 
 
 
