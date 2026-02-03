@@ -1,3 +1,5 @@
-a.out
-build/
+
+/a.out
+/build/
+/dump.txt
 
