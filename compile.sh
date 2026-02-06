@@ -13,13 +13,16 @@ if [[ -z "$compiler" ]]; then
 	$compiler="TCC"	
 fi
 
+libraries=" -lm -lpthread -lvulkan -lX11 -lfreetype -I/usr/include/freetype2"
+
+
 TIME=$(get_time_us)
 if [[ "$compiler" = "GCC" ]]; then
-	gcc src/main.c -march=x86-64 -lm -lpthread -O0 -gdwarf -Wpedantic
+	gcc src/main.c -march=x86-64 -O0 -gdwarf -Wpedantic $libraries 
 elif [[ "$compiler" = "CLANG" ]]; then
-	clang src/main.c -march=x86-64 -lm -lpthread -O0 -gdwarf -Wpedantic
+	clang src/main.c -march=x86-64 -O0 -gdwarf -Wpedantic $libraries
 else
-	tcc src/main.c -lm -lpthread -gdwarf -Wpedantic
+	tcc $libraries src/main.c -gdwarf -Wpedantic  
 fi
 
 TIME=$(($(get_time_us)-TIME))

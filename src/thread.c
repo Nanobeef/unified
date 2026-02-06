@@ -1,4 +1,4 @@
-Mutex create_mutex()
+Mutex create_mutex(void)
 {
 	Mutex mutex;
 	pthread_mutex_init(&mutex.handle, NULL);
@@ -19,7 +19,7 @@ void unlock_mutex(Mutex *mutex)
 	pthread_mutex_unlock(&mutex->handle);
 }
 
-Cond create_cond()
+Cond create_cond(void)
 {
 	Cond cond;
 	pthread_cond_init(&cond.handle, NULL);
@@ -78,10 +78,9 @@ void binary_wait_semaphore(Semaphore *semaphore, Mutex *mutex)
 	}
 }
 
-void* empty_thread_work(Thread *thread)
+void* end_thread_work(Thread *thread)
 {
-	printf("empty work\n");
-	return NULL;
+	return (void*)-1lu;
 }
 
 void *thread_wrapper(void *args)
@@ -99,16 +98,9 @@ void *thread_wrapper(void *args)
 		void *ret = 0;
 		if(function)
 			ret = function(thread);
-		else
-			ret = empty_thread_work(thread);
-			
-		if(ret != NULL)
-		{
+		if(ret == (void*)-1lu)
 			break;			
-		}
-
 	}
-	printf("return\n");
 	return NULL;
 }
 
@@ -128,11 +120,30 @@ Thread *allocate_thread(Arena *arena, u64 scratch_arena_size)
 
 Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size)
 {
+	stack_size = Max(KiB(8), stack_size);
 	Thread *thread = allocate_thread(arena, scratch_arena_size);
 
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stack_size);
+
+	lock_mutex(&thread_table_mutex);
+	for(u32 i = 0; i < max_thread_count; i++)
+	{
+		if(thread_table[i] == 0)
+		{
+			thread_table[i] = thread;
+			thread->index = i;
+			goto FOUND;
+		}
+	}
+	unlock_mutex(&thread_table_mutex);
+	printf("Too many threads in global array!\n");
+	pthread_attr_destroy(&attr);
+	return 0;
+
+FOUND:
+	unlock_mutex(&thread_table_mutex);
 
 	if(pthread_create(&thread->handle, &attr, thread_wrapper, (void*)thread))
 	{
@@ -140,6 +151,32 @@ Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size)
 	}
 	pthread_attr_destroy(&attr);
 	return thread;
+}
+
+void destroy_thread(Thread *thread)
+{
+	if(thread == 0)
+		return;
+	if(thread->index > max_thread_count)
+		return;
+
+	thread->index = max_thread_count+1;
+
+	wait_for_thread_idle(thread);	
+	begin_thread_work(thread, end_thread_work);
+	lock_mutex(&thread_table_mutex);
+	for(u32 i = 0; i < max_thread_count; i++)
+	{
+		if(thread_table[i])
+		{
+			if(thread_table[i]->handle == thread->handle)
+			{
+				thread_table[i] = 0;
+				break;
+			}
+		}
+	}
+	unlock_mutex(&thread_table_mutex);
 }
 
 void wait_for_thread_idle(Thread *thread)
@@ -154,7 +191,38 @@ b32 begin_thread_work(Thread *thread, PFN_Thread *function)
 {
 	lock_mutex(&thread->mutex);
 	binary_signal_semaphore(&thread->working_semaphore);
-	atomic_store(&thread->function, (PFN_Void*)function);
+	atomic_store(&thread->function, (u64)function);
 	unlock_mutex(&thread->mutex);
 	return false;
+}
+
+Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function)
+{
+	Thread *thread = create_thread(arena, scratch_arena_size, stack_size);
+	if(thread)
+	{
+		wait_for_thread_idle(thread);
+		begin_thread_work(thread, function);
+	}
+	return thread;
+}
+
+Thread* current_thread(void)
+{
+	pthread_t handle = pthread_self();
+	if(main_thread->handle == handle)
+	{
+		return main_thread;
+	}
+	for(u32 i = 0; i < max_thread_count; i++)
+	{
+		if(thread_table[i])
+		{
+			if(thread_table[i]->handle == handle)
+			{
+				return thread_table[i];
+			}
+		}
+	}
+	return 0;
 }

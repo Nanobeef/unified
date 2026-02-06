@@ -19,9 +19,23 @@ typedef uint64_t u64;
 
 typedef s8 b8;
 typedef s32 b32;
-
 typedef float f32;
 typedef double f64;
+
+#define U8_MAX UINT8_MAX
+#define U16_MAX UINT16_MAX
+#define U32_MAX UINT32_MAX
+#define U64_MAX UINT64_MAX
+
+#define S8_MAX INT8_MAX
+#define S16_MAX INT16_MAX
+#define S32_MAX INT32_MAX
+#define S64_MAX INT64_MAX
+
+#define S8_MIN INT8_MIN
+#define S16_MIN INT16_MIN
+#define S32_MIN INT32_MIN
+#define S64_MIN INT64_MIN
 
 #define KiB(n) ((u64)(n) << 10)
 #define MiB(n) ((u64)(n) << 20)
@@ -29,6 +43,8 @@ typedef double f64;
 
 #define Min(a,b) (((a) < (b)) ? (a) : (b))
 #define Max(a,b) (((a) > (b)) ? (a) : (b))
+
+#define Arrlen( XXX ) (sizeof(XXX) / sizeof((XXX)[0]))
 
 #define ForwardAlign(n, p) (((u64)(n) + ((u64)(p) - 1)) & (~((u64)(p) -1)))
 
@@ -79,6 +95,13 @@ typedef double f64;
 	#include <unistd.h>
 	#include <sys/wait.h>
 	#include <pthread.h>
+#endif
+
+
+
+// Sometimes a function pointer will be cast to and from an atomic u64
+#if __SIZEOF_POINTER__ != 8
+	#error This program only supports 64-bit machines.
 #endif
 
 

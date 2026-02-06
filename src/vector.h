@@ -27,7 +27,6 @@
 #ifdef AVX512_CORE
 #endif
 
-
 #include "f32x2.h"
 #include "f64x2.h"
 
