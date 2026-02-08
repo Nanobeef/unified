@@ -1,5 +1,4 @@
 
-
 String8* enumerate_src(Arena *arena)
 {
 	DIR *dir = opendir("src/");

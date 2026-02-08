@@ -41,6 +41,8 @@ typedef struct Thread{
 	Semaphore idling_semaphore;
 	Mutex mutex;
 	atomic u64 function;
+
+	Print print;
 }Thread;
 
 typedef void*(PFN_Thread)(Thread*);
@@ -49,7 +51,7 @@ typedef void*(PFN_Void)(void*);
 Thread *allocate_thread(Arena *arena, u64 scratch_arena_size);
 Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size);
 void destroy_thread(Thread *thread);
-void wait_for_thread_idle(Thread *thread);
+void wait_for_thread(Thread *thread);
 b32 begin_thread_work(Thread *thread, PFN_Thread *function);
 Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function);
 Thread* current_thread(void);

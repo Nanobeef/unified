@@ -4,7 +4,7 @@ typedef struct String8{
 	u8 *data;
 }String8;
 
-#define str8_lit( STR ) ((String8){.len = sizeof(STR)-1, .data = (u8*)(STR)})
+#define str8_lit( STR ) (String8){.len = sizeof(STR)-1, .data = (u8*)(STR)}
 
 String8 str8_alloc(Arena *arena, u64 len);
 String8 str8_cstr(Arena *arena, const char *src);

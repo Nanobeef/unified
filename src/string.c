@@ -123,7 +123,6 @@ b32 str8_equal(String8 a, String8 b)
 
 b32 str8_file_type_equal(String8 file, String8 type)
 {
-	u32 type_len = 0;
 	for(u32 i = file.len; i; i--)
 	{
 		if(file.data[i] == '.')

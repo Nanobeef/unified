@@ -114,7 +114,8 @@ Thread *allocate_thread(Arena *arena, u64 scratch_arena_size)
 	thread->working_semaphore = create_semaphore(0);
 	thread->idling_semaphore = create_semaphore(0);
 	thread->mutex = create_mutex();
-	thread->index = 0;
+	thread->index = U32_MAX;
+	thread->handle = pthread_self();
 	return thread;
 }
 
@@ -162,7 +163,7 @@ void destroy_thread(Thread *thread)
 
 	thread->index = max_thread_count+1;
 
-	wait_for_thread_idle(thread);	
+	wait_for_thread(thread);	
 	begin_thread_work(thread, end_thread_work);
 	lock_mutex(&thread_table_mutex);
 	for(u32 i = 0; i < max_thread_count; i++)
@@ -179,7 +180,7 @@ void destroy_thread(Thread *thread)
 	unlock_mutex(&thread_table_mutex);
 }
 
-void wait_for_thread_idle(Thread *thread)
+void wait_for_thread(Thread *thread)
 {
 	lock_mutex(&thread->mutex);
 	binary_wait_semaphore(&thread->idling_semaphore, &thread->mutex);	
@@ -201,7 +202,7 @@ Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_T
 	Thread *thread = create_thread(arena, scratch_arena_size, stack_size);
 	if(thread)
 	{
-		wait_for_thread_idle(thread);
+		wait_for_thread(thread);
 		begin_thread_work(thread, function);
 	}
 	return thread;
@@ -210,6 +211,11 @@ Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_T
 Thread* current_thread(void)
 {
 	pthread_t handle = pthread_self();
+	if(main_thread == NULL)
+	{
+		printf("ABORT: Trying to use scratch arenas before the main thread was created!\n");
+		exit(1);
+	}
 	if(main_thread->handle == handle)
 	{
 		return main_thread;

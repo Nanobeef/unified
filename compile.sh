@@ -18,7 +18,7 @@ libraries=" -lm -lpthread -lvulkan -lX11 -lfreetype -I/usr/include/freetype2"
 
 TIME=$(get_time_us)
 if [[ "$compiler" = "GCC" ]]; then
-	gcc src/main.c -march=x86-64 -O0 -gdwarf -Wpedantic $libraries 
+	gcc src/main.c -march=x86-64 -O0 -gdwarf -Wall $libraries 
 elif [[ "$compiler" = "CLANG" ]]; then
 	clang src/main.c -march=x86-64 -O0 -gdwarf -Wpedantic $libraries
 else
