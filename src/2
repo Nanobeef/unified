@@ -1,3 +1,5 @@
+// Innomonate's Arena
+
 #include "base.h"
 #include "vector.h"
 #include "time.h"
@@ -11,32 +13,18 @@
 
 #include <dirent.h>
 
-#define VK_USE_PLATFORM_XCB_KHR
 #include <vulkan/vulkan.h>
-
-#include <xcb/xcb_keysyms.h>
-#include <X11/keysym.h>
-
-#include "window.h"
 #include "vk_instance.h"
 #include "vk_device.h"
-#include "vk_surface.h"
-#include "vk_swapchain.h"
-#include "vk_command.h"
-#include "vk_sync.h"
-#include "vk_queue.h"
 
+#include <X11/Xlib.h>
 
+#include "window.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
 #include "vk_instance.c"
 #include "vk_device.c"
-#include "vk_surface.c"
-#include "vk_swapchain.c"
-#include "vk_command.c"
-#include "vk_sync.c"
-#include "vk_queue.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -53,7 +41,6 @@ Thread **thread_table;
 #include "file.c"
 #include "print.c"
 #include "window.c"
-#include "collatz.c"
 
 void init(void)
 {
@@ -71,39 +58,15 @@ void cleanup(void)
 	exit(0);
 }
 
-
 s32 main(void)
 {
 	init();
 
-	Window *window = create_window(main_arena);
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
-	GraphicsSurface surface = create_graphics_surface(window, instance);
-
 	GraphicsDevice *device = create_graphics_device(main_arena, instance, INTEGRATED_GRAPHICS_DEVICE);
-	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
-	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
-	b32 running = true;
-	Event e = {0};
-	while(running)
-	{
-		poll_window(window, event_ring_buffer);
-		while(ring_buffer_pop(event_ring_buffer, &e))
-		{
-			if(e.type == EVENT_KEYBOARD) 
-			{
-				if(e.keyboard.key == KEY_ESCAPE)
-				{
-					running = false;
-				}
-			}
-		}
-	}
-	destroy_graphics_swapchain(swapchain);
+
 	destroy_graphics_device(device);
-	destroy_graphics_surface(surface);
 	destroy_graphics_instance(instance);
-	destroy_window(window);
 
 	cleanup();
 }

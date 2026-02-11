@@ -24,6 +24,8 @@ void arena_set(Arena *arena, u64 pos);
 Scratch find_scratch(struct Thread *thread, u32 conflict_count, Arena **conflicts);
 void regress_scratch(Scratch scratch);
 
+#define arena_push_type( ARENA, ZERO, COUNT , TYPE , NAME) TYPE* NAME = (TYPE*)arena_push(ARENA, ZERO, (COUNT) * sizeof(TYPE));
+
 
 #define TOTAL( VARIABLE ) (*(((u64*)(VARIABLE))-1))
 #define USED( VARIABLE ) (*(((u64*)(VARIABLE))-2))
@@ -46,3 +48,62 @@ typedef struct{
 #define inherit_buffer( ARENA , TYPE ) (TYPE*)allocate_buffer_stride((ARENA), sizeof(TYPE), ((ARENA)->size - sizeof(Buffer)) / sizeof(TYPE))
 
 void *allocate_buffer_stride(Arena *arena, u64 stride, u64 count);
+
+typedef struct{
+	u64 a,b;
+	u64 mask;
+	u64 used;
+	u64 total;
+}RingBuffer;
+
+#define allocate_ring_buffer( ARENA, TYPE, COUNT ) (TYPE*)allocate_ring_buffer_stride(ARENA, sizeof(TYPE), COUNT)
+
+#define ring_buffer_push( VARIABLE , VAL )\
+({\
+	RingBuffer *ring_buffer = ((RingBuffer*)(VARIABLE))-1;\
+	if(ring_buffer->used == ring_buffer->total)\
+	{\
+		print("ERROR: Ring buffer overflow\n");\
+		ring_buffer->used = 0;\
+	}\
+	(VARIABLE)[ring_buffer->a] = (VAL);\
+	ring_buffer->a++;\
+	ring_buffer->a &= ring_buffer->mask;\
+	ring_buffer->used++;\
+	VARIABLE;\
+})
+
+#define ring_buffer_pop( VARIABLE, VAL_PTR )\
+({\
+	b32 ret = false;\
+	RingBuffer *ring_buffer = (RingBuffer*)(VARIABLE)-1;\
+	if((ring_buffer->used != 0))\
+	{\
+		*(VAL_PTR) = (VARIABLE)[ring_buffer->b];\
+		ring_buffer->b++;\
+		ring_buffer->b &= ring_buffer->mask;\
+		ring_buffer->used--;\
+		ret = true;\
+	}\
+	ret;\
+})
+
+void *allocate_ring_buffer_stride(Arena *arena, u64 stride, u64 count);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

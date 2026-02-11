@@ -26,7 +26,6 @@ f32 f32x2_length_squared(f32x2 v);
 f32 f32x2_length(f32x2 v);
 f32x2 f32x2_unit(f32x2 v);
 f32 f32x2_distance(f32x2 v0, f32x2 v1);
-f32 f32_lerp(f32 a, f32 b, f32 t);
 f32x2 f32x2_lerp(f32x2 v0, f32x2 v1, f32 t);
 f32 f32x2_angle(f32x2 v);
 f32x2 f32x2_trunc(f32x2 v, f32 max_mag);

@@ -93,7 +93,20 @@ void *allocate_array_stride(Arena *arena, u64 stride, u64 count)
 
 void *allocate_buffer_stride(Arena *arena, u64 stride, u64 count)
 {
-	Array *buffer = arena_push(arena, 0, count * stride + sizeof(Buffer));
+	Buffer *buffer = arena_push(arena, 0, count * stride + sizeof(Buffer));
 	buffer->total = count;
 	return (void*)(buffer + 1);
+}
+
+void *allocate_ring_buffer_stride(Arena *arena, u64 stride, u64 count)
+{
+	count = next_power_of_two(count);
+	RingBuffer *ring_buffer = arena_push(arena, 0, count * stride * sizeof(RingBuffer));	
+	ring_buffer->total = count;
+	ring_buffer->used = 0;
+	ring_buffer->mask = count-1;
+	ring_buffer->a = 0;
+	ring_buffer->b = 0;
+	ring_buffer++;
+	return ring_buffer;
 }

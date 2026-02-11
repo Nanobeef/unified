@@ -151,10 +151,6 @@ f32 f32x2_distance(f32x2 v0, f32x2 v1)
 	return dst;
 }
 
-f32 f32_lerp(f32 a, f32 b, f32 t)
-{
-	return (b-a)*t+a;
-}
 
 f32x2 f32x2_lerp(f32x2 v0, f32x2 v1, f32 t)
 {

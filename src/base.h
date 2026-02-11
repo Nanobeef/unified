@@ -48,6 +48,23 @@ typedef double f64;
 
 #define ForwardAlign(n, p) (((u64)(n) + ((u64)(p) - 1)) & (~((u64)(p) -1)))
 
+static u64 next_power_of_two(u64 x)
+{
+    if(x == 0)
+    {
+        return 1;
+    }
+    x--;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    x |= x >> 32;
+    x++;
+    return x;
+}
+
 #define Align( x ) (__attribute__((aligned(x))))
 
 #if defined(__TINYC__)

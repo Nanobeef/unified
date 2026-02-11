@@ -40,7 +40,19 @@ u64 print(const char *format, ...)
 u64 vprint(Arena *arena, const char *format, va_list l)
 {
 	String8 str = str8_vprint(arena, format, l);
+	TerminalColor color = current_thread()->print.terminal_color;
+	if(color)
+	{
+		if(color > TERMINAL_COLOR_MAX)
+			color++;
+
+		printf("\033[38;5;%dm", color - 1);
+	}
 	fwrite((const void*)str.data, 1, str.len, stdout);
+	if(color)
+	{
+		printf("\033[0m");
+	}
 	return str.len;
 }
 

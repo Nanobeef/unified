@@ -5,8 +5,26 @@ VkBool32 vulkan_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* user_data) {
 
-	printf("VULKAN ERROR: %s\n", data->pMessage);
+	switch(severity)
+	{
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:{
+		current_thread()->print.terminal_color = 244;
+		break;
+		print("VULKAN VERBOSE:\n    %cs\n", data->pMessage);
+	}break;
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:{
+		current_thread()->print.terminal_color = 202;
+		print("VULKAN WARNING:\n    %cs\n", data->pMessage);
+	}break;
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:{
+		current_thread()->print.terminal_color = 196;
+		print("VULKAN ERROR:\n    %cs\n", data->pMessage);
+	}break;
+	default:
+	break;
+	}
 
+	current_thread()->print.terminal_color = 0;
 
 	return false;
 }
@@ -28,6 +46,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 		const char *extensions[] = {
 			"VK_EXT_debug_utils",
 			"VK_KHR_surface",
+			"VK_KHR_xcb_surface",
 		};
 
 		VkInstanceCreateInfo info = {

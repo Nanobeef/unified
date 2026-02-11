@@ -4,7 +4,7 @@
 {\
 	if((call) != VK_SUCCESS)\
 	{\
-		printf("VK_ASSERT %d\n", (call));\
+		print("VK_ASSERT %s32\n", (call));\
 		exit(80085);\
 	}\
 }
