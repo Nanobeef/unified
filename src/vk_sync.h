@@ -20,8 +20,14 @@ void destroy_graphics_fence(GraphicsFence fence);
 void destroy_graphics_fences(u32 count, GraphicsFence *fences);
 void wait_for_graphics_fence(GraphicsFence fence);
 void wait_for_graphics_fences(u32 count, GraphicsFence *fences);
+void reset_graphics_fence(GraphicsFence fence);
+void reset_graphics_fences(u32 count, GraphicsFence *fences);
+void wait_and_reset_graphics_fence(GraphicsFence fence);
+void wait_and_reset_graphics_fences(u32 count, GraphicsFence *fences);
 
 GraphicsSemaphore create_graphics_semaphore(GraphicsDevice *device);
 GraphicsSemaphore* create_graphics_semaphores(Arena *arena, GraphicsDevice *device, u32 count);
 void destroy_graphics_semaphore(GraphicsSemaphore semaphore);
 void destroy_graphics_semaphores(u32 count, GraphicsSemaphore *semaphores);
+
+

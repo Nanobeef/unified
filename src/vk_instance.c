@@ -5,26 +5,26 @@ VkBool32 vulkan_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* user_data) {
 
+// The following errors only happen on newer api verions. DeviceSwapchain resize stuff
+    if(data->messageIdNumber == 1461184347){return VK_FALSE;}
+    if(data->messageIdNumber == 1402107823){return VK_FALSE;}
+
 	switch(severity)
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:{
-		current_thread()->print.terminal_color = 244;
 		break;
-		print("VULKAN VERBOSE:\n    %cs\n", data->pMessage);
+		print("VULKAN VERBOSE:\n    %s\n", data->pMessage);
 	}break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:{
-		current_thread()->print.terminal_color = 202;
-		print("VULKAN WARNING:\n    %cs\n", data->pMessage);
+		print("VULKAN WARNING:\n    %s\n", data->pMessage);
 	}break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:{
-		current_thread()->print.terminal_color = 196;
-		print("VULKAN ERROR:\n    %cs\n", data->pMessage);
+		printf("VULKAN ERROR:\n    %s\n", data->pMessage);
 	}break;
 	default:
 	break;
 	}
 
-	current_thread()->print.terminal_color = 0;
 
 	return false;
 }

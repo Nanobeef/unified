@@ -4,17 +4,18 @@ void reset_arena(Arena *arena)
 	arena->pos = sizeof(Arena);
 }
 
-Arena *init_arena(void *data, u64 size)
+Arena *init_arena(u64 size, void *data)
 {
 	Arena *arena = data;
 	arena->size = size;
 	reset_arena(arena);
-	return arena; }
+	return arena; 
+}
 Arena* allocate_arena(u64 size)
 {
 	size = ForwardAlign(size, 4096);
 	void *data = malloc(size);
-	Arena *arena = init_arena(data, size);
+	Arena *arena = init_arena(size, data);
 	return arena;
 }
 

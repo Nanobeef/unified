@@ -35,6 +35,7 @@ typedef struct{
 }GraphicsDeviceQueueFamily;
 
 typedef struct DeviceMemoryHeap{
+	struct GraphicsDevice *device;
 	VkMemoryPropertyFlags property_flags;
 	u32 heap_index;
 	u32 type_index;

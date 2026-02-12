@@ -202,6 +202,7 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 		VkMemoryType type = device->physical.memory_properties.memoryTypes[i];
 		VkMemoryHeap heap = device->physical.memory_properties.memoryHeaps[type.heapIndex];
 		device->memory_heaps[i] = (GraphicsDeviceMemoryHeap){
+			.device = device,
 			.property_flags = type.propertyFlags,
 			.heap_index = type.heapIndex,
 			.type_index = i,
@@ -209,6 +210,9 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 		};
 	}
 	device->device_heap = &device->memory_heaps[0];
+	device->host_and_device_heap = &device->memory_heaps[0];
+	device->host_cached_heap = &device->memory_heaps[0];
+	device->host_coherent_heap = &device->memory_heaps[0];
 
 	for(u32 i = 0; i < device->memory_heap_count; i++)
 	{
@@ -236,6 +240,10 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 			device->host_coherent_heap = heap;
 			break;
 		}
+	}
+	for(u32 i = 0; i < device->memory_heap_count; i++)
+	{
+		device->memory_heaps[i].backup_chain = device->host_cached_heap;
 	}
 
 	regress_scratch(scratch);

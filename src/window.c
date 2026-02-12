@@ -93,6 +93,7 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 				dst.window.type = WINDOW_RESIZE;
 				dst.window.width = ce->width;
 				dst.window.height = ce->height;
+				ring_buffer_push(event_ring_buffer, dst);
 			}break;
 
 

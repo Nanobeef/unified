@@ -14,7 +14,7 @@ typedef struct{
 }Scratch;
 
 void reset_arena(Arena *arena);
-Arena *init_arena(void *data, u64 size);
+Arena *init_arena(u64 size, void *data);
 Arena* allocate_arena(u64 size);
 void free_arena(Arena *arena);
 void* arena_push(Arena *arena, b32 zero, u64 size);

@@ -109,7 +109,7 @@ Thread *allocate_thread(Arena *arena, u64 scratch_arena_size)
 	Thread *thread = arena_push(arena, true, sizeof(Thread));
 	for(u32 i = 0; i < 2; i++)
 	{
-		thread->scratch_arenas[i] = init_arena(arena_push(arena, 0, scratch_arena_size), scratch_arena_size);
+		thread->scratch_arenas[i] = init_arena(scratch_arena_size, arena_push(arena, 0, scratch_arena_size));
 	}
 	thread->working_semaphore = create_semaphore(0);
 	thread->idling_semaphore = create_semaphore(0);
