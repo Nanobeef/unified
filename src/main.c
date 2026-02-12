@@ -25,6 +25,7 @@
 #include "vk_memory.h"
 #include "vk_image.h"
 #include "vk_buffer.h"
+#include "vk_barrier.h"
 #include "vk_surface.h"
 #include "vk_swapchain.h"
 #include "vk_queue.h"
@@ -43,6 +44,7 @@
 #include "vk_image.c"
 #include "vk_buffer.c"
 #include "vk_memory.c"
+#include "vk_barrier.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -85,7 +87,7 @@ s32 main(void)
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
 
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, INTEGRATED_GRAPHICS_DEVICE);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, DISCRETE_GRAPHICS_DEVICE);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
 
@@ -128,6 +130,7 @@ s32 main(void)
 	
 
 	b32 running = true;
+	u32 image_index = 0;
 
 	Event e = {0};
 	while(running)
@@ -159,15 +162,33 @@ s32 main(void)
 		}
 		resize_arena = resize_arenas[resize_index];
 
-		wait_and_reset_graphics_fence(swapchain_fences[frame_index]);
-		
-		u32 image_index = acquire_graphics_swapchain_image(resize_arena, &swapchain, swapchain_semaphores[frame_index], swapchain_fences[frame_index], should_resize);
+		if(image_index != U32_MAX)
+		{
+			wait_and_reset_graphics_fence(swapchain_fences[frame_index]);
+		}
+		while(U32_MAX == (image_index = acquire_graphics_swapchain_image(resize_arena, &swapchain, swapchain_semaphores[frame_index], swapchain_fences[frame_index], should_resize)));
 
 		{
 			wait_and_reset_graphics_fence(render_fences[frame_index]);
 			GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 
+			{
+				GraphicsImageMemoryBarrier image_barrier = {
+					.image = swapchain.images[image_index],
+					.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+					.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				};
+
+				GraphicsPipelineBarrier barrier = {
+					.image_memory_barrier_count = 1,
+					.image_memory_barriers = &image_barrier,
+					.src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+					.dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				};
+				
+				cmd_graphics_pipeline_barrier(cb, barrier);
+			}
 
 
 			end_graphics_command_buffer(cb);
@@ -186,7 +207,9 @@ s32 main(void)
 
 		frame_accum++;
 	}
+	vkDeviceWaitIdle(device->handle);
 
+	destroy_graphics_command_pools(frame_count, render_command_pools); 
 	destroy_graphics_swapchain(swapchain);
 	destroy_graphics_device(device);
 	destroy_graphics_surface(surface);

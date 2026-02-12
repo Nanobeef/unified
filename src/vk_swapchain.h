@@ -11,7 +11,7 @@ typedef struct{
 	VkSwapchainCreateInfoKHR create_info;
 }GraphicsSwapchain;
 
-GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsDevice *device, VkSwapchainCreateInfoKHR info);
+GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain swapchain);
 GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surface, GraphicsDevice *device);
 void destroy_graphics_swapchain(GraphicsSwapchain swapchain);
 u32 acquire_graphics_swapchain_image(Arena *resize_arena, GraphicsSwapchain *swapchain, GraphicsSemaphore signal_semaphore, GraphicsFence signal_fence, b32 window_resize);

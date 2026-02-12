@@ -14,20 +14,24 @@ VkImageView create_graphics_swapchain_image_view(GraphicsDevice *device, VkImage
 	return handle;
 }
 
-GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsDevice *device, VkSwapchainCreateInfoKHR info)
+GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain swapchain)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	GraphicsSwapchain swapchain = {.device = device};
+	GraphicsDevice *device = swapchain.device;
+	VkSwapchainCreateInfoKHR info = swapchain.create_info;
 
-	VK_ASSERT(vkCreateSwapchainKHR(device->handle, &info, vkb, &swapchain.handle));
-	if(info.oldSwapchain)
-	{
-		vkDestroySwapchainKHR(device->handle, info.oldSwapchain, vkb);
-	}
+	VK_ASSERT(vkCreateSwapchainKHR(swapchain.device->handle, &info, vkb, &swapchain.handle));
 
 	vkGetSwapchainImagesKHR(device->handle, swapchain.handle, &swapchain.image_count, 0);
 	arena_push_type(scratch.arena, 0, swapchain.image_count, VkImage, images);
 	vkGetSwapchainImagesKHR(device->handle, swapchain.handle, &swapchain.image_count, images);
+
+	if(info.oldSwapchain)
+	{
+		vkDestroySwapchainKHR(device->handle, info.oldSwapchain, vkb);
+	}
+	info.oldSwapchain = swapchain.handle;
+
 
 	swapchain.images = arena_push(arena, 0, swapchain.image_count * sizeof(GraphicsDeviceImage));
 
@@ -39,7 +43,7 @@ GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsDevice *devi
 			.size = u32x2_set(info.imageExtent.width, info.imageExtent.height),
 			.format = info.imageFormat,
 			.tiling = VK_IMAGE_TILING_OPTIMAL,
-			.subresource_range = {0,1,0,1, VK_IMAGE_ASPECT_COLOR_BIT},
+			.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
 		};
 	}
 	swapchain.create_info = info;
@@ -112,7 +116,8 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 		.presentMode = chosen_present_mode,
 		.clipped = VK_FALSE,
 	};
-	GraphicsSwapchain swapchain = recreate_graphics_swapchain(arena, device, info);
+	GraphicsSwapchain swapchain = {.device = device, .create_info = info};
+	swapchain = recreate_graphics_swapchain(arena, swapchain);
 	return swapchain;
 }
 
@@ -130,20 +135,21 @@ u32 acquire_graphics_swapchain_image(Arena *resize_arena, GraphicsSwapchain *swa
 {
 	if(window_recreate)
 	{
+		vkDeviceWaitIdle(swapchain->device->handle);
 		VkSurfaceCapabilitiesKHR capabilities = {0};
 		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(swapchain->device->physical.handle, swapchain->create_info.surface, &capabilities);
 		swapchain->create_info.imageExtent = capabilities.minImageExtent;
-		GraphicsSwapchain new_swapchain = recreate_graphics_swapchain(resize_arena, swapchain->device, swapchain->create_info);
-		for(u32 i = 0; i < swapchain->image_count; i++)
-		{
-			vkDestroyImageView(swapchain->device->handle, swapchain->images[i].view, vkb);
-		}
-		*swapchain = new_swapchain;
+		*swapchain = recreate_graphics_swapchain(resize_arena, *swapchain);
 	}
 	VkResult result = vkAcquireNextImageKHR(swapchain->device->handle, swapchain->handle, U64_MAX, signal_semaphore.handle, signal_fence.handle, &swapchain->image_index);
-	if((result != VK_SUCCESS) && (result != VK_SUBOPTIMAL_KHR))
+	if(result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
-		print("SWAPCHAIN ACQUIRE: %s32\n", result);
+		vkDeviceWaitIdle(swapchain->device->handle);
+		VkSurfaceCapabilitiesKHR capabilities = {0};
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(swapchain->device->physical.handle, swapchain->create_info.surface, &capabilities);
+		swapchain->create_info.imageExtent = capabilities.minImageExtent;
+		*swapchain = recreate_graphics_swapchain(resize_arena, *swapchain);
+		return U32_MAX;
 	}
 	return swapchain->image_index;
 }

@@ -49,8 +49,26 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 			"VK_KHR_xcb_surface",
 		};
 
+		VkValidationFeatureEnableEXT enabled_validation[] = {
+			VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+		};
+		VkValidationFeatureDisableEXT disabled_validation[] = {
+			VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT,
+			VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT,
+			VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT
+		};
+
+		VkValidationFeaturesEXT validation_features = {
+			.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+			.enabledValidationFeatureCount = Arrlen(enabled_validation),
+			.pEnabledValidationFeatures = enabled_validation,
+			.disabledValidationFeatureCount = Arrlen(disabled_validation),
+			.pDisabledValidationFeatures = disabled_validation,
+		};
+
 		VkInstanceCreateInfo info = {
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+			.pNext = &validation_features,
 			.pApplicationInfo = &appinfo,
 			.enabledLayerCount = Arrlen(layers),
 			.ppEnabledLayerNames = layers,

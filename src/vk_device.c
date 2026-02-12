@@ -27,6 +27,7 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 	{
 		physical_devices[i].handle = physical_device_handles[i];
 		vkGetPhysicalDeviceProperties(physical_devices[i].handle, &physical_devices[i].properties);
+		print("%cs\n", physical_devices[i].properties.deviceName);
 		vkGetPhysicalDeviceMemoryProperties(physical_devices[i].handle, &physical_devices[i].memory_properties);
 		vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[i].handle, &physical_devices[i].queue_family_count, 0);
 		physical_devices[i].queue_family_properties = arena_push(scratch.arena, 0, physical_devices[i].queue_family_count * sizeof(VkQueueFamilyProperties));
@@ -34,10 +35,9 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 	}
 
 
-
 	if(physical_device_count > INTEGRATED_GRAPHICS_DEVICE)
 	{
-		print("Why are there 1024 GPUS?");
+		print("Why are there more than 1024 GPUS?");
 		chosen_index = 0;
 		goto INDEX_CHOSEN;
 	}
