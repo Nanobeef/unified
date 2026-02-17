@@ -13,8 +13,10 @@ GraphicsDeviceMemory allocate_graphics_device_memory(GraphicsDeviceMemoryHeap *h
 		case VK_ERROR_OUT_OF_HOST_MEMORY:
 			print("Out of HOST memory!!!\n");
 			exit(0);
+			break;
 		case VK_ERROR_OUT_OF_DEVICE_MEMORY:
 			memory = allocate_graphics_device_memory(heap->device->host_cached_heap, size);
+			break;
 		case VK_SUCCESS:
 		default:
 		break;

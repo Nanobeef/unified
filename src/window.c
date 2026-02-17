@@ -31,8 +31,11 @@ Window *create_window(Arena *arena)
 
 
 
-	u32 value_list[] = {screen->black_pixel, event_mask};
-	u32 value_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
+	u32 value_list[] = {screen->black_pixel, XCB_GRAVITY_STATIC, event_mask};
+	u32 value_mask = XCB_CW_BACK_PIXEL | XCB_CW_BIT_GRAVITY | XCB_CW_EVENT_MASK;
+
+
+	u32x2 size = {1024, 1024};
 
 	xcb_create_window(
 		connection,
@@ -40,7 +43,7 @@ Window *create_window(Arena *arena)
 		handle,
 		screen->root,
 		0,0,
-		1024, 1024,
+		size.x, size.y,
 		1,
 		XCB_WINDOW_CLASS_INPUT_OUTPUT,
 		screen->root_visual,
@@ -58,6 +61,7 @@ Window *create_window(Arena *arena)
 		.connection = connection,
 		.handle = handle,
 		.key_symbols = key_symbols,
+		.size = size,
 	};
 
 	return window;
@@ -93,6 +97,7 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 				dst.window.type = WINDOW_RESIZE;
 				dst.window.width = ce->width;
 				dst.window.height = ce->height;
+				window->size = u32x2_set(ce->width, ce->height);
 				ring_buffer_push(event_ring_buffer, dst);
 			}break;
 

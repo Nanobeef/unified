@@ -1,0 +1,229 @@
+
+
+f32 lerp(f32 a, f32 b, f32 t)
+{
+	return (b-a) * t + a;
+}
+
+f32m2 f32m2_zero()
+{
+	return (f32m2){
+		0.0,0.0,
+		0.0,0.0	
+		};
+}
+f32m2 f32m2_identity()
+{
+	return (f32m2){
+		1.0,0.0,
+		0.0,1.0	
+		};
+}
+f32m2 f32m2_mul(f32m2 a, f32m2 b)
+{
+	return (f32m2){
+		a.a * b.a + a.b * b.c, a.a * b.b + a.b * b.d,	
+		a.c * b.a + a.d * b.c, a.c * b.b + a.d * b.d,
+	};
+}
+// 2D Linear transformations
+f32m2 f32m2_scale(f32 x, f32 y)
+{
+	return (f32m2){
+		x,0.0,
+		0.0,y	
+		};
+}
+f32m2 f32m2_shear(f32 x, f32 y)
+{ return (f32m2){
+		1.0,x,
+		y,1.0	
+		};
+}
+f32m2 f32m2_rotate(f32 radians)
+{
+	f32 s = sinf(radians);
+	f32 c = cosf(radians);
+	return (f32m2){
+		c, -s,
+		s,  c,
+	};
+}
+
+f32x2 f32x2_mul_f32m2(f32x2 v, f32m2 m)
+{
+	return (f32x2){
+		v.x * m.a + v.y * m.b,
+		v.x * m.c + v.y * m.d,
+	};
+
+	// reflect
+
+	return (f32x2){
+		v.x * m.a + v.y * m.c,
+		v.x * m.b + v.y * m.d,
+	};
+}
+
+f32x2 f32x2_scale_rotate(f32x2 v, f32 scale, f32 radians)
+{
+	f32m2 mat = f32m2_mul(
+		f32m2_rotate(radians),
+		f32m2_scale(scale, scale)
+	);
+	return f32x2_mul_f32m2(v, mat);
+}
+
+
+f32m3 f32m3_zero()
+{
+	return (f32m3){
+		0.0, 0.0, 0.0,
+		0.0, 0.0, 0.0,
+		0.0, 0.0, 0.0
+	};
+}
+f32m3 f32m3_identity()
+{
+	return (f32m3){
+		1.0, 0.0, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, 1.0
+	};
+}
+
+f32m3 f32m3_add(f32m3 a, f32m3 b)
+{
+	f32m3 c;
+	for(u32 i = 0; i < 9; i++)
+	{
+		((f32*)&c)[i] = ((f32*)&a)[i] + ((f32*)&b)[i];
+	}
+	return c;
+}
+
+f32m3 f32m3_mul(f32m3 a, f32m3 b)
+{
+	return (f32m3){
+		a.a*b.a+a.b*b.d+a.c*b.g, a.a*b.b+a.b*b.e+a.c*b.h, a.a*b.c+a.b*b.f+a.c*b.i, 
+		a.d*b.a+a.e*b.d+a.f*b.g, a.d*b.b+a.e*b.e+a.f*b.h, a.d*b.c+a.e*b.f+a.f*b.i, 
+		a.g*b.a+a.h*b.d+a.i*b.g, a.g*b.b+a.h*b.e+a.i*b.h, a.g*b.c+a.h*b.f+a.i*b.i, 
+	};
+}
+// 2D Affine
+
+f32m3 f32m3_affine_translate_add(f32m3 a, f32 x, f32 y)
+{
+	a.c += x;
+	a.f += y;
+	return a;
+}
+f32m3 f32m3_affine_translate(f32 x, f32 y)
+{
+	return (f32m3){
+		1.0, 0.0, x  ,
+		0.0, 1.0, y  ,
+		0.0, 0.0, 1.0,
+	};
+}
+f32m3 f32m3_affine_scale(f32 x, f32 y)
+{
+	return (f32m3){
+		x  , 0.0, 0.0,
+		0.0, y  , 0.0,
+		0.0, 0.0, 1.0,
+	};
+}
+f32m3 f32m3_affine_shear(f32 x, f32 y)
+{
+	return (f32m3){
+		1.0, x  , 0.0,
+		y  , 1.0, 0.0,
+		0.0, 0.0, 1.0,
+	};
+}
+f32m3 f32m3_affine_rotate(f32 radians)
+{
+	f32 c = cosf(radians);
+	f32 s = sinf(radians);
+	return (f32m3){
+		c  ,-s  , 0.0,
+		s  , c  , 0.0,
+		0.0, 0.0, 1.0
+	};
+}
+
+f32m3 f32m3_lerp(f32m3 a, f32m3 b, f32 t)
+{
+	f32m3 c;
+	for(u32 i = 0; i < 9; i++)
+	{
+		((f32*)&c)[i] = lerp(((f32*)&a)[i], ((f32*)&b)[i], t);
+	}
+	return c;
+}
+f32x2 f32x2_mul_f32m3(f32x2 v, f32m3 m)
+{
+	return (f32x2){
+		m.a * v.x + m.b * v.y + 1.0 * m.c,
+		m.d * v.x + m.e * v.y + 1.0 * m.f,	
+	};
+}
+
+f32m3 f32m3_mul_va(u32 c, ...)
+{
+	va_list l;
+	va_start(l, c);
+	f32m3 mat = f32m3_identity();
+	for(u32 i = 0; i < c; i++)
+	{
+		f32m3 mat_arg = va_arg(l, f32m3);
+		mat = f32m3_mul(mat,mat_arg); 
+	}
+	va_end(l);
+	return mat;
+}
+f32m3p f32m3_padding(f32m3 a)
+{
+	f32m3p b = {
+		a.a, a.b, a.c, 0.0,
+		a.d, a.e, a.f, 0.0,
+		a.g, a.h, a.i, 0.0,
+	};
+	return b;
+}
+
+f32x2 f32x2_affine_offset(f32m3 m)
+{
+	return f32x2_set(m.c, m.f);	
+}
+f32 f32m3_affine_det(f32m3 m)
+{
+	return m.a * m.e - m.b * m.d;
+}
+
+f32m3 f32m3_affine_inverse(f32m3 in)
+{
+	f32 det = f32m3_affine_det(in);
+	f32 inv_det = 1.0 / det;
+
+	f32 inv_a =  inv_det * in.e;
+	f32 inv_b = -inv_det * in.b;
+	f32 inv_d = -inv_det * in.d;
+	f32 inv_e =  inv_det * in.a;
+
+	if(det == 0.0f)
+	{
+		printf("Matrix is not invertable\n");
+		exit(1);
+	}
+	
+	f32 inv_c = -(inv_a * in.c + inv_b  * in.f);
+	f32 inv_f = -(inv_d * in.c + inv_e  * in.f);
+
+	f32m3 out;
+	out.a = inv_a;	out.b = inv_b;	out.c = inv_c;
+	out.d = inv_d;	out.e = inv_e;	out.f = inv_f;
+	out.g = 0.0f;	out.h = 0.0f;	out.i = 1.0f;
+	return out;
+}

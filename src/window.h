@@ -5,6 +5,10 @@ typedef struct{
 	xcb_connection_t *connection;
 	xcb_window_t handle;
 	xcb_key_symbols_t *key_symbols;
+
+	u32x2 size;
+
+
 }Window;
 
 Window *create_window(Arena *arena);

@@ -45,19 +45,8 @@
 #include "f64x2.c"
 
 
-/* SIMD Vector Sizes:
-
-	128-bit:
-		f32x4, f64x2, s8x8, s16x8, s32x4, s64x2,
-	256-bit:
-		f32x8, f64x4, s8x32, s16x16, s32x8, s64x4,
-	512-bit:
-		f32x16, f64x8, s8x64, s16x32, s32x16, s64x8,
-*/
-
-/* Useful Vector Sizes:
-		
-*/
+#include "f32m3.h"
+#include "f32m3.c"
 
 
 

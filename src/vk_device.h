@@ -31,6 +31,7 @@ typedef struct{
 	struct GraphicsDevice *device;
 	u32 family_index;
 	u32 queue_count;
+	VkQueueFlags flags;
 	GraphicsDeviceQueue *queues;
 }GraphicsDeviceQueueFamily;
 

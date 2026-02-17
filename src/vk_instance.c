@@ -68,7 +68,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 
 		VkInstanceCreateInfo info = {
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-			.pNext = &validation_features,
+//			.pNext = &validation_features,
 			.pApplicationInfo = &appinfo,
 			.enabledLayerCount = Arrlen(layers),
 			.ppEnabledLayerNames = layers,

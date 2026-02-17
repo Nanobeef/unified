@@ -8,7 +8,7 @@ f32x4 f32x4_set1(f32 a)
 
 f32x4 f32x4_set(f32 r, f32 g, f32 b, f32 a)
 {
-	f32x4 v = {.r = a, .g = b, .b = b, .a = a};
+	f32x4 v = {.r = r, .g = g, .b = b, .a = a};
 	return v;
 }
 

@@ -27,7 +27,7 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 	{
 		physical_devices[i].handle = physical_device_handles[i];
 		vkGetPhysicalDeviceProperties(physical_devices[i].handle, &physical_devices[i].properties);
-		print("%cs\n", physical_devices[i].properties.deviceName);
+		//print("%cs\n", physical_devices[i].properties.deviceName);
 		vkGetPhysicalDeviceMemoryProperties(physical_devices[i].handle, &physical_devices[i].memory_properties);
 		vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[i].handle, &physical_devices[i].queue_family_count, 0);
 		physical_devices[i].queue_family_properties = arena_push(scratch.arena, 0, physical_devices[i].queue_family_count * sizeof(VkQueueFamilyProperties));
@@ -161,17 +161,19 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 
 	VK_ASSERT(vkCreateDevice(device->physical.handle, &info, vkb, &device->handle));
 
-	device->queue_families = arena_push(arena, 0, sizeof(GraphicsDeviceQueueFamily));
+	device->queue_families = arena_push(arena, 0, queue_family_count * sizeof(GraphicsDeviceQueueFamily));
 	for(u32 i = 0; i < queue_family_count; i++)
 	{
 		u32 queue_count = device->physical.queue_family_properties[i].queueCount;
+		VkQueueFlags flags = device->physical.queue_family_properties[i].queueFlags;
 		device->queue_families[i] = (GraphicsDeviceQueueFamily){
 			.device = device,
 			.family_index = i,
 			.queue_count = queue_count,
 			.queues = arena_push(arena, 0, sizeof(GraphicsDeviceQueue) * queue_count),
+			.flags = flags,
 		};
-		for(u32 j = 0; j < device->physical.queue_family_properties[i].queueCount; j++)
+		for(u32 j = 0; j < queue_count; j++)
 		{
 			VkQueue handle = 0;
 			vkGetDeviceQueue(device->handle, i, j, &handle);
@@ -187,10 +189,22 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	for(u32 i = 0; i < queue_family_count; i++)
 	{
 		GraphicsDeviceQueueFamily *q = &device->queue_families[i];
-		VkQueueFlags flags = device->physical.queue_family_properties[i].queueCount;
-		if(flags & (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT))
+		VkQueueFlags required_flags = (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT);
+		if((q->flags & required_flags) == required_flags)
 		{
 			device->main_queue_family = q;
+			break;
+		}
+	}
+	for(u32 i = 0; i < queue_family_count; i++)
+	{
+		GraphicsDeviceQueueFamily *q = &device->queue_families[i];
+		VkQueueFlags good_flags = (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT);
+		VkQueueFlags bad_flags = (VK_QUEUE_GRAPHICS_BIT);
+		if(((q->flags & good_flags) == good_flags) && ((q->flags & bad_flags) == 0))
+		{
+			device->transfer_queue_family = q;
+			break;
 		}
 	}
 

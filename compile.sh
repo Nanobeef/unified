@@ -13,6 +13,8 @@ if [[ -z "$compiler" ]]; then
 	$compiler="TCC"	
 fi
 
+
+
 libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lfreetype -I/usr/include/freetype2"
 
 TIME=$(get_time_us)

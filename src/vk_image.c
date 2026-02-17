@@ -51,11 +51,29 @@ GraphicsDeviceImage create_graphics_device_image(GraphicsDevice *device, u32x2 s
 	return create_graphics_device_image_explicit(device->device_heap, size, format, usage, VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT);
 }
 
-
 void destroy_graphics_device_image(GraphicsDeviceImage image)
 {
 	free_graphics_device_memory(image.memory);
 	vkDestroyImageView(image.device->handle, image.view, vkb);
 	vkDestroyImage(image.device->handle, image.handle, vkb);
+}
+
+void cmd_clear_graphics_device_image(GraphicsCommandBuffer cb, GraphicsDeviceImage image, f32x4 color)
+{
+	VkClearColorValue ccv = {.float32 = {color.r, color.g, color.b, color.a}};
+	vkCmdClearColorImage(cb.handle, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &ccv, 1, &image.subresource_range);
+}
+
+void cmd_blit_graphics_device_image(GraphicsCommandBuffer cb, GraphicsDeviceImage src, GraphicsDeviceImage dst)
+{
+	VkImageBlit region = {
+		.srcSubresource = {src.subresource_range.aspectMask,0,0,1},
+		.srcOffsets[0] = {0,0,0},
+		.srcOffsets[1] = {src.size.x, src.size.y, 1},
+		.dstSubresource = {dst.subresource_range.aspectMask,0,0,1},
+		.dstOffsets[0] = {0,0,0},
+		.dstOffsets[1] = {dst.size.x, dst.size.y, 1},
+	};
+	vkCmdBlitImage(cb.handle, src.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST);
 }
 
