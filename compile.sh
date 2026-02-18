@@ -19,7 +19,7 @@ libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lfreetype -I/usr/include
 
 TIME=$(get_time_us)
 if [[ "$compiler" = "GCC" ]]; then
-	gcc src/main.c -march=native -O0 -gdwarf -Wall $libraries 
+	gcc src/main.c -march=native -O4 -gdwarf $libraries 
 elif [[ "$compiler" = "CLANG" ]]; then
 	clang src/main.c -march=native -O0 -gdwarf -Wpedantic $libraries
 else

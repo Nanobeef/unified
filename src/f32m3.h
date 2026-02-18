@@ -47,6 +47,7 @@ f32m3p f32m3_padding(f32m3 a);
 f32x2 f32x2_affine_offset(f32m3 m);
 
 f32 f32m3_affine_det(f32m3 m);
+f32 f32m3_det(f32m3 m);
 f32m3 f32m3_affine_inverse(f32m3 in);
 
 f32m3 print_f32m3(f32m3 m);

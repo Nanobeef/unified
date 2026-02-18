@@ -5,9 +5,9 @@ VkBool32 vulkan_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* user_data) {
 
-// The following errors only happen on newer api verions. DeviceSwapchain resize stuff
-    if(data->messageIdNumber == 1461184347){return VK_FALSE;}
-    if(data->messageIdNumber == 1402107823){return VK_FALSE;}
+// The following errors only happen on newer api verions. Swapchain stuff
+   if(data->messageIdNumber == 1461184347){return VK_FALSE;}
+   if(data->messageIdNumber == 1402107823){return VK_FALSE;}
 
 	switch(severity)
 	{

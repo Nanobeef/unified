@@ -159,9 +159,52 @@ Event init_event();
 void post_event(Event *event_ring_buffer, Event event);
 void print_event(Event event);
 
-typedef struct{
+typedef struct Button{
     b32 pressed;
     u64 press_time;
     u64 release_time;
     u64 action_time;
+	struct Button *previous;
 }Button;
+
+typedef struct Wheel{
+	s64 accum;
+	s64 action;
+	u64 action_time;
+	struct Wheel *previous;
+}Wheel;
+
+typedef struct Mouse{
+	u64 move_time;	
+	f32x2 pixel_position;
+	f32x2 pixel_delta;
+	struct Mouse *previous;
+}Mouse;
+
+typedef struct{
+	Button a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
+	Button n0,n1,n2,n3,n4,n5,n6,n7,n8,n9;
+	Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
+	Button left_control;
+	Button left_shift;
+
+	Button	left_mouse;
+	Button	right_mouse;
+	Button	middle_mouse;
+	Wheel	wheel;
+	Mouse	mouse;
+
+
+}PolledEvents;
+
+
+
+
+
+
+
+
+
+
+
+

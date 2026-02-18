@@ -192,7 +192,6 @@ f32m3p f32m3_padding(f32m3 a)
 	};
 	return b;
 }
-
 f32x2 f32x2_affine_offset(f32m3 m)
 {
 	return f32x2_set(m.c, m.f);	
@@ -202,6 +201,10 @@ f32 f32m3_affine_det(f32m3 m)
 	return m.a * m.e - m.b * m.d;
 }
 
+f32 f32m3_det(f32m3 m)
+{
+	return (m.a*m.e*m.i) + (m.b*m.f*m.g) + (m.c+m.d+m.h) - (m.g*m.e*m.c) - (m.h*m.f*m.a) - (m.i*m.d*m.b);
+}
 f32m3 f32m3_affine_inverse(f32m3 in)
 {
 	f32 det = f32m3_affine_det(in);

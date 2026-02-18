@@ -111,7 +111,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 	VkSwapchainCreateInfoKHR info = {
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 		.surface = surface.handle,
-		.minImageCount = 2,
+		.minImageCount = surface_capabilities.minImageCount,
 		.imageFormat = chosen_surface_format.format,
 		.imageColorSpace = chosen_surface_format.colorSpace,
 		.imageExtent = surface_capabilities.minImageExtent,

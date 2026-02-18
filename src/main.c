@@ -35,6 +35,8 @@
 #include "vk_queue.h"
 #include "vk_rasterize.h"
 #include "vk_pipeline.h"
+#include "camera.h"
+#include "random.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -51,6 +53,8 @@
 #include "vk_memory.c"
 #include "vk_barrier.c"
 #include "vk_rasterize.c"
+#include "camera.c"
+#include "random.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -85,9 +89,45 @@ void cleanup(void)
 	exit(0);
 }
 
+
 s32 main(void)
 {
 	init();
+
+	u64 count = 1024 * 1024;
+
+	u64 t;
+	f64 avg;
+	for(u32 j = 0; j < 3; j++)
+	{
+		print("\n%u32\n", j);
+		t = get_time_ns();
+		{
+			u64 x = splitmix(0);
+			for(u32 i = 0; i < count; i++)
+			{
+				x = splitmix(x);
+			}
+			volatile u64 vol = x;
+		}
+		t = get_time_ns() - t;
+		avg = (f64)t / (f64)count;
+		print("SPLM: %f64 ns\n", avg);
+		t = get_time_ns();
+		{
+			RomuQuad rq = romu_quad_seed(0);
+			u64 x = romu_quad(&rq);
+			for(u32 i = 0; i < count; i++)
+			{
+				x = romu_quad(&rq);
+			}
+			volatile u64 vol = x;
+		}
+		t = get_time_ns() - t;
+		avg = (f64)t / (f64)count;
+		print("ROMU: %f64 ns\n", avg);
+	}
+
 
 	Window *window = create_window(main_arena);
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
@@ -132,8 +172,8 @@ s32 main(void)
 
 	b32 running = true;
 
-	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM);
-
+	VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
+	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, VK_SAMPLE_COUNT_1_BIT, target_format);
 
 	
 	Vertex2 vertices[3] = {
@@ -149,7 +189,7 @@ s32 main(void)
 	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, target_images);
 	for(u32 i = 0; i < swapchain.image_count; i++)
 	{
-		target_images[i] = create_graphics_device_image(device, swapchain.size, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+		target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 	}
 	VkFramebuffer *framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, 0);
 
@@ -206,7 +246,7 @@ s32 main(void)
 
 				for(u32 i = 0; i < swapchain.image_count; i++)
 				{
-					target_images[i] = create_graphics_device_image(device, swapchain.size, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+					target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 				}
 				framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, 0);
 
@@ -241,7 +281,7 @@ s32 main(void)
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
 			{
-				f32m3 m = f32m3_identity();
+				f32m3 m = f32m3_affine_scale(0.5, 0.5);
 				f32m3p mp = f32m3_padding(m);
 				vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
@@ -291,8 +331,6 @@ s32 main(void)
 				cmd_graphics_pipeline_barrier(cb, barrier);
 			}
 
-
-
 			end_graphics_command_buffer(cb);
 		
 			submit_command_buffers(
@@ -310,6 +348,13 @@ s32 main(void)
 		frame_accum++;
 	}
 	vkDeviceWaitIdle(device->handle);
+
+	for(u32 i = 0; i < swapchain.image_count; i++)
+	{
+		vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
+		destroy_graphics_device_image(target_images[i]);
+	}
+	destroy_graphics_device_buffer(vb);
 
 	destroy_rasterization_pipelines(rasterization_pipelines);
 	destroy_graphics_semaphores(frame_count, swapchain_semaphores);
