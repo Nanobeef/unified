@@ -13,10 +13,10 @@ VkBool32 vulkan_debug_callback(
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:{
 		break;
-		print("VULKAN VERBOSE:\n    %s\n", data->pMessage);
+		printf("VULKAN VERBOSE:\n    %s\n", data->pMessage);
 	}break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:{
-		print("VULKAN WARNING:\n    %s\n", data->pMessage);
+		printf("VULKAN WARNING:\n    %s\n", data->pMessage);
 	}break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:{
 		printf("VULKAN ERROR:\n    %s\n", data->pMessage);
@@ -34,7 +34,6 @@ VkBool32 vulkan_debug_callback(
 GraphicsInstance *create_graphics_instance(Arena *arena)
 {
 	GraphicsInstance *instance = arena_push(arena, 0, sizeof(GraphicsInstance));
-	{
 		VkApplicationInfo appinfo = {
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.apiVersion = VK_API_VERSION_1_0,
@@ -77,7 +76,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 		};
 		VK_ASSERT(vkCreateInstance(&info, vkb, &instance->handle)); 
 		// Accounts for the majority of the application startup time. ~38ms on AMD cards, much longer on Nvidia cards.
-	}
+	if(info.enabledLayerCount)
 	{
 		load_vulkan_instance_function(instance->handle, vkCreateDebugUtilsMessengerEXT);
 		VkDebugUtilsMessengerCreateInfoEXT info = {
@@ -100,8 +99,11 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 
 void destroy_graphics_instance(GraphicsInstance *instance)
 {
-	load_vulkan_instance_function(instance->handle, vkDestroyDebugUtilsMessengerEXT);
-	vkDestroyDebugUtilsMessengerEXT(instance->handle, instance->debug_messenger, vkb);
+	if(instance->debug_messenger)
+	{
+		load_vulkan_instance_function(instance->handle, vkDestroyDebugUtilsMessengerEXT);
+		vkDestroyDebugUtilsMessengerEXT(instance->handle, instance->debug_messenger, vkb);
+	}
 	vkDestroyInstance(instance->handle, vkb);
 }
 

@@ -5,8 +5,6 @@
 // As measured on a Zen4 CPU, romu_quad is about 4x faster than splitmix when using scalars.
 
 
-
-
 // Fast Splittable Pseudorandom Number Generators (Steele, Lea, Flood)
 u64 splitmix(u64 s)
 {

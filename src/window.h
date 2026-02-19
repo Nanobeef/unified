@@ -7,6 +7,7 @@ typedef struct{
 	xcb_key_symbols_t *key_symbols;
 
 	u32x2 size;
+	u32x2 position;
 
 
 }Window;

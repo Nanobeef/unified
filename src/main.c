@@ -37,6 +37,7 @@
 #include "vk_pipeline.h"
 #include "camera.h"
 #include "random.h"
+#include "vk_vertex_buffer.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -55,6 +56,7 @@
 #include "vk_rasterize.c"
 #include "camera.c"
 #include "random.c"
+#include "vk_vertex_buffer.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -69,6 +71,7 @@ Thread **thread_table;
 #include "arena.c"
 #include "thread.c"
 #include "file.c"
+#include "event.c"
 #include "print.c"
 #include "window.c"
 #include "collatz.c"
@@ -93,41 +96,6 @@ void cleanup(void)
 s32 main(void)
 {
 	init();
-
-	u64 count = 1024 * 1024;
-
-	u64 t;
-	f64 avg;
-	for(u32 j = 0; j < 3; j++)
-	{
-		print("\n%u32\n", j);
-		t = get_time_ns();
-		{
-			u64 x = splitmix(0);
-			for(u32 i = 0; i < count; i++)
-			{
-				x = splitmix(x);
-			}
-			volatile u64 vol = x;
-		}
-		t = get_time_ns() - t;
-		avg = (f64)t / (f64)count;
-		print("SPLM: %f64 ns\n", avg);
-		t = get_time_ns();
-		{
-			RomuQuad rq = romu_quad_seed(0);
-			u64 x = romu_quad(&rq);
-			for(u32 i = 0; i < count; i++)
-			{
-				x = romu_quad(&rq);
-			}
-			volatile u64 vol = x;
-		}
-		t = get_time_ns() - t;
-		avg = (f64)t / (f64)count;
-		print("ROMU: %f64 ns\n", avg);
-	}
-
 
 	Window *window = create_window(main_arena);
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
@@ -170,59 +138,51 @@ s32 main(void)
 	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
 
-	b32 running = true;
 
 	VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
-	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, VK_SAMPLE_COUNT_1_BIT, target_format);
+	VkSampleCountFlags sample_count = VK_SAMPLE_COUNT_8_BIT;
+	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format);
 
+	GraphicsDeviceVertexBuffer vb = create_graphics_device_vertex_buffer(device->host_cached_heap, MiB(64), sizeof(Vertex2)); 
+	RomuQuad rq = romu_quad_seed(10032221);
 	
-	Vertex2 vertices[3] = {
-		{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = {{ 0.0, -0.5}}},
-		{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = {{-0.5,  0.5}}},
-		{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = {{ 0.5,  0.5}}},
-	};
-	GraphicsDeviceBuffer vb = create_graphics_device_buffer(device->host_cached_heap, sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-	memcpy(vb.memory.mapping, vertices, vb.size);
+	for(u32 i = 0; i < 100000; i++)
+	{
+		f32x2 point = romu_quad_f32x2(&rq);
+		f32 scale = 0.01;
+
+		Vertex2 vertices[3] = {
+			{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
+			{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
+			{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
+		};
+
+		graphics_device_vertex_buffer_push(&vb, 3, vertices);
+	}
 
 
 	const u32 max_swapchain_image_count = 8;
 	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, target_images);
+	GraphicsDeviceImage *msaa_images = 0;
+	if(sample_count > VK_SAMPLE_COUNT_1_BIT)
+		msaa_images = arena_push(main_arena, 0, max_swapchain_image_count * sizeof(GraphicsDeviceImage));
 	for(u32 i = 0; i < swapchain.image_count; i++)
 	{
 		target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
+			msaa_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL, sample_count);
 	}
-	VkFramebuffer *framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, 0);
+	VkFramebuffer *framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, msaa_images);
 
-	Event e = {0};
-	while(running)
+	while(true)
 	{
 		frame_index = frame_accum % frame_count;
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
 
-
 		poll_window(window, event_ring_buffer);
-		b32 should_resize = false;
-		while(ring_buffer_pop(event_ring_buffer, &e))
-		{
-			if(e.type == EVENT_KEYBOARD) 
-			{
-				if(e.keyboard.key == KEY_ESCAPE)
-				{
-					running = false;
-				}
-			}
-			if(e.type == EVENT_WINDOW)
-			{
-				if(e.window.type == WINDOW_RESIZE)
-				{
-					should_resize = true;
-					resize_accum++;
-					resize_index = resize_accum % resize_count;
-					resize_arena = resize_arenas[resize_index];
-					reset_arena(resize_arena);
-				}
-			}
-		}
+		PolledEvents pe = poll_events(frame_arena, event_ring_buffer);
+		if(pe.escape.pressed)
+			break;
 
 		u32 image_index = 0;
 		GraphicsDeviceImage swapchain_image = swapchain.images[image_index];
@@ -230,14 +190,21 @@ s32 main(void)
 
 		{
 			VkResult result = vkAcquireNextImageKHR(device->handle, swapchain.handle, U64_MAX, swapchain_semaphores[frame_index].handle, 0, &swapchain.image_index);
-			if(should_resize || (result != VK_SUCCESS))
+			if(pe.window_should_resize || (result != VK_SUCCESS))
 			{
+				resize_accum++;
+				resize_index = resize_accum % resize_count;
+				resize_arena = resize_arenas[resize_index];
+				reset_arena(resize_arena);
+
 				wait_for_graphics_fences(frame_count, render_fences);
 				VkSurfaceCapabilitiesKHR capabilities = {0};
 				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical.handle, swapchain.create_info.surface, &capabilities);
 				swapchain.create_info.imageExtent = capabilities.minImageExtent;
 				for(u32 i = 0; i < swapchain.image_count; i++)
 				{
+					if(sample_count > VK_SAMPLE_COUNT_1_BIT)
+						destroy_graphics_device_image(msaa_images[i]);
 					destroy_graphics_device_image(target_images[i]);
 					vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
 				}
@@ -247,8 +214,10 @@ s32 main(void)
 				for(u32 i = 0; i < swapchain.image_count; i++)
 				{
 					target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+					if(sample_count > VK_SAMPLE_COUNT_1_BIT)
+						msaa_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL, sample_count);
 				}
-				framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, 0);
+				framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, msaa_images);
 
 				destroy_graphics_semaphore(swapchain_semaphores[frame_index]);
 				swapchain_semaphores[frame_index] = create_graphics_semaphore(device);
@@ -264,7 +233,7 @@ s32 main(void)
 			GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 
-			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.1, 0.1, 0.1, 1.0));
+			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.01, 0.01, 0.01, 1.0));
 			{
 				VkRect2D scissor = {
 					.offset = {0,0},
@@ -281,13 +250,11 @@ s32 main(void)
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
 			{
-				f32m3 m = f32m3_affine_scale(0.5, 0.5);
+				f32m3 m = f32m3_affine_scale(2.0, 2.0);
 				f32m3p mp = f32m3_padding(m);
 				vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
-				u64 offset = 0;
-				vkCmdBindVertexBuffers(cb.handle, 0, 1, &vb.handle, &offset);
-				vkCmdDraw(cb.handle, Arrlen(vertices),1, 0,0);
+				cmd_draw_graphics_device_vertex_buffer(cb, vb);
 			}
 			vkCmdEndRenderPass(cb.handle);
 
@@ -325,7 +292,7 @@ s32 main(void)
 					.image_memory_barrier_count = 1,
 					.image_memory_barriers = &image_barrier,
 					.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-					.dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+					.dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 				};
 				
 				cmd_graphics_pipeline_barrier(cb, barrier);
@@ -353,8 +320,11 @@ s32 main(void)
 	{
 		vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
 		destroy_graphics_device_image(target_images[i]);
+		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
+			destroy_graphics_device_image(msaa_images[i]);
+			
 	}
-	destroy_graphics_device_buffer(vb);
+	destroy_graphics_device_vertex_buffer(vb);
 
 	destroy_rasterization_pipelines(rasterization_pipelines);
 	destroy_graphics_semaphores(frame_count, swapchain_semaphores);

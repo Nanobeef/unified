@@ -78,6 +78,10 @@ typedef enum{
 	PRINT_KEYWORD_s64,	
 	PRINT_KEYWORD_f32,	
 	PRINT_KEYWORD_f64,	
+
+	PRINT_KEYWORD_u32x2,	
+	PRINT_KEYWORD_s32x2,	
+
 	PRINT_KEYWORD_String8,
 	PRINT_KEYWORD_Cstring,
 	PRINT_KEYWORD_void_pointer
@@ -91,6 +95,7 @@ typedef struct{
 	String8 string;	
 	PrintKeywordIndex index;
 }PrintKeyword;
+
 
 #define p1( A ) {str8_lit(#A), PRINT_KEYWORD_##A}
 #define p2( A , B ) {str8_lit(#A), PRINT_KEYWORD_##B}
@@ -106,6 +111,8 @@ PrintKeyword keywords[] = {
 	p1(s64),
 	p1(f32),
 	p1(f64),
+	p1(u32x2),
+	p1(s32x2),
 	p2(s, String8),
 	p2(cs, Cstring),
 };
@@ -157,6 +164,14 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		printf("f64\n");
 		f64 d = *(f64*)data;
 		len = snprintf((char*)dst, size, "%f", (f64)d);
+	}break;
+	case PRINT_KEYWORD_u32x2:{
+		u32x2 d = *(u32x2*)data;
+		len = snprintf((char*)dst, size, "(%u %u)", d.x, d.y);
+	}break;
+	case PRINT_KEYWORD_s32x2:{
+		s32x2 d = *(s32x2*)data;
+		len = snprintf((char*)dst, size, "(%d %d)", d.x, d.y);
 	}break;
 	case PRINT_KEYWORD_String8:{
 		String8 d = *(String8*)data;
@@ -221,6 +236,10 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 	}break;
 	case PRINT_KEYWORD_f64:{
 		f64 d = va_arg(l, f64);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_s32x2:{
+		s32x2 d = va_arg(l, s32x2);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
 	case PRINT_KEYWORD_String8:{

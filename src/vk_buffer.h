@@ -10,3 +10,4 @@ typedef struct{
 }GraphicsDeviceBuffer;
 
 GraphicsDeviceBuffer create_graphics_device_buffer(GraphicsDeviceMemoryHeap *heap, u64 size, VkBufferUsageFlags usage);
+void destroy_graphics_device_buffer(GraphicsDeviceBuffer buffer);

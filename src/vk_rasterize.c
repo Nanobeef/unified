@@ -97,9 +97,9 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 			{
 				.srcSubpass = 0,
 				.dstSubpass = VK_SUBPASS_EXTERNAL,
-				.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT,
-				.srcAccessMask = VK_ACCESS_NONE,
+				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
 				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
 			},
@@ -161,9 +161,9 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 			{
 				.srcSubpass = 0,
 				.dstSubpass = VK_SUBPASS_EXTERNAL,
-				.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 				.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT,
-				.srcAccessMask = VK_ACCESS_NONE,
+				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
 				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
 			},
@@ -461,7 +461,7 @@ VkFramebuffer *create_rasterization_framebuffers(Arena *arena, RasterizationPipe
 {
 	Scratch scratch = find_scratch(0,0,0);
 	u32 attachment_count = (target_images != 0) + (msaa_images != 0);
-	VkFramebuffer *framebuffers = arena_push(arena, 0, sizeof(VkFramebuffer) * attachment_count);
+	VkFramebuffer *framebuffers = arena_push(arena, 0, sizeof(VkFramebuffer) * count);
 	for(u32 i = 0; i < count; i++)
 	{
 		VkImageView *attachments = arena_push(scratch.arena, 0, attachment_count * sizeof(VkImageView));
@@ -471,7 +471,8 @@ VkFramebuffer *create_rasterization_framebuffers(Arena *arena, RasterizationPipe
 		}
 		else if(attachment_count == 2)
 		{
-			attachments[1] = msaa_images[i].view;
+			attachments[0] = msaa_images[i].view;
+			attachments[1] = target_images[i].view;
 		}
 		else
 		{

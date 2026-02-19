@@ -14,6 +14,36 @@ Window *create_window(Arena *arena)
 	xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
 	xcb_screen_t *screen = iter.data;
 
+	if(0){
+
+	xcb_visualid_t visual = 0;
+	{
+		xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);	
+		while(depth_iter.rem)
+		{
+			if(depth_iter.data->depth == 32)
+			{
+				xcb_visualtype_iterator_t vis_iter = xcb_depth_visuals_iterator(depth_iter.data);
+				while(vis_iter.rem)
+				{
+					if(vis_iter.data->_class == XCB_VISUAL_CLASS_TRUE_COLOR)
+					{
+						//print("%u32\n", vis_iter.data->_class);
+						visual = vis_iter.data->visual_id;
+						goto VISUAL_FOUND;
+					}
+					xcb_visualtype_next(&vis_iter);
+				}
+			}
+			xcb_depth_next(&depth_iter);
+		}
+	VISUAL_FOUND:
+	}
+
+
+	xcb_colormap_t colormap = xcb_generate_id(connection);
+	xcb_create_colormap(connection, XCB_COLORMAP_ALLOC_NONE, colormap, screen->root, visual);
+	}
 
 	xcb_window_t handle = xcb_generate_id(connection);
 
@@ -30,8 +60,7 @@ Window *create_window(Arena *arena)
 		XCB_EVENT_MASK_FOCUS_CHANGE ;
 
 
-
-	u32 value_list[] = {screen->black_pixel, XCB_GRAVITY_STATIC, event_mask};
+	u32 value_list[] = {XCB_NONE, XCB_GRAVITY_STATIC,  event_mask};
 	u32 value_mask = XCB_CW_BACK_PIXEL | XCB_CW_BIT_GRAVITY | XCB_CW_EVENT_MASK;
 
 
@@ -72,33 +101,166 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 {
 	xcb_generic_event_t *event;
 	u32 event_count = 0;
+	u64 time = get_time_ns();
 	while((event = xcb_poll_for_event(window->connection)))
 	{
 		event_count++;
-		switch(event->response_type & ~0x80)
+		Event e = {.time = time, .window_pointer = window};
+		u32 response = event->response_type & ~0x80;
+		switch(response)
 		{
 			case XCB_KEY_PRESS:{
 			case XCB_KEY_RELEASE:
-				xcb_key_press_event_t *kp = (xcb_key_press_event_t*)event;
-				xcb_keysym_t sym = xcb_key_symbols_get_keysym(window->key_symbols, kp->detail, 0);
-				Event dst = {0};
-				dst.type = EVENT_KEYBOARD;
-				dst.keyboard.type = XCB_KEY_PRESS ? KEYBOARD_PRESS : KEYBOARD_RELEASE;
-				if(sym == XK_Escape)
+				xcb_keysym_t sym;
+				if(response == XCB_KEY_PRESS)
 				{
-					dst.keyboard.key = KEY_ESCAPE;
-					ring_buffer_push(event_ring_buffer, dst);
+					xcb_key_press_event_t *kp = (xcb_key_press_event_t*)event;
+					sym = xcb_key_symbols_get_keysym(window->key_symbols, kp->detail, 0);
+					e.keyboard.type = KEYBOARD_PRESS;
 				}
+				else
+				{
+					xcb_key_release_event_t *kr = (xcb_key_release_event_t*)event;
+					sym = xcb_key_symbols_get_keysym(window->key_symbols, kr->detail, 0);
+					e.keyboard.type = KEYBOARD_RELEASE;
+				}
+				e.type = EVENT_KEYBOARD;
+				switch(sym)
+				{
+					case XK_Escape: e.keyboard.key = KEY_ESCAPE; break;
+					case XK_a: e.keyboard.key = KEY_A; break;
+					case XK_b: e.keyboard.key = KEY_B; break;
+					case XK_c: e.keyboard.key = KEY_C; break;
+					case XK_d: e.keyboard.key = KEY_D; break;
+					case XK_e: e.keyboard.key = KEY_E; break;
+					case XK_f: e.keyboard.key = KEY_F; break;
+					case XK_g: e.keyboard.key = KEY_G; break;
+					case XK_h: e.keyboard.key = KEY_H; break;
+					case XK_i: e.keyboard.key = KEY_I; break;
+					case XK_j: e.keyboard.key = KEY_J; break;
+					case XK_k: e.keyboard.key = KEY_K; break;
+					case XK_l: e.keyboard.key = KEY_L; break;
+					case XK_n: e.keyboard.key = KEY_M; break;
+					case XK_m: e.keyboard.key = KEY_M; break;
+					case XK_o: e.keyboard.key = KEY_O; break;
+					case XK_p: e.keyboard.key = KEY_P; break;
+					case XK_q: e.keyboard.key = KEY_Q; break;
+					case XK_r: e.keyboard.key = KEY_R; break;
+					case XK_s: e.keyboard.key = KEY_S; break;
+					case XK_t: e.keyboard.key = KEY_T; break;
+					case XK_u: e.keyboard.key = KEY_U; break;
+					case XK_v: e.keyboard.key = KEY_V; break;
+					case XK_w: e.keyboard.key = KEY_W; break;
+					case XK_x: e.keyboard.key = KEY_X; break;
+					case XK_y: e.keyboard.key = KEY_Y; break;
+					case XK_z: e.keyboard.key = KEY_Z; break;
+
+					case XK_0: e.keyboard.key = KEY_0; break;
+					case XK_1: e.keyboard.key = KEY_1; break;
+					case XK_2: e.keyboard.key = KEY_2; break;
+					case XK_3: e.keyboard.key = KEY_3; break;
+					case XK_4: e.keyboard.key = KEY_4; break;
+					case XK_5: e.keyboard.key = KEY_5; break;
+					case XK_6: e.keyboard.key = KEY_6; break;
+					case XK_7: e.keyboard.key = KEY_7; break;
+					case XK_8: e.keyboard.key = KEY_9; break;
+					case XK_9: e.keyboard.key = KEY_9; break;
+
+					case XK_grave: e.keyboard.key = KEY_GRAVE; break;
+					case XK_Control_L: e.keyboard.key = KEY_LEFT_CONTROL; break;
+					case XK_Control_R: e.keyboard.key = KEY_RIGHT_CONTROL; break;
+					case XK_Shift_L: e.keyboard.key = KEY_LEFT_SHIFT; break;
+					case XK_Shift_R: e.keyboard.key = KEY_RIGHT_SHIFT; break;
+
+					case XK_Left: e.keyboard.key = KEY_LEFT; break;
+					case XK_Right: e.keyboard.key = KEY_RIGHT; break;
+					case XK_Up: e.keyboard.key = KEY_UP; break;
+					case XK_Down: e.keyboard.key = KEY_DOWN; break;
+
+					case XK_F1: e.keyboard.key = KEY_F1; break;
+					case XK_F2: e.keyboard.key = KEY_F2; break;
+					case XK_F3: e.keyboard.key = KEY_F3; break;
+					case XK_F4: e.keyboard.key = KEY_F4; break;
+					case XK_F5: e.keyboard.key = KEY_F5; break;
+					case XK_F6: e.keyboard.key = KEY_F6; break;
+					case XK_F7: e.keyboard.key = KEY_F7; break;
+					case XK_F8: e.keyboard.key = KEY_F8; break;
+					case XK_F9: e.keyboard.key = KEY_F9; break;
+					case XK_F10: e.keyboard.key = KEY_F10; break;
+					case XK_F11: e.keyboard.key = KEY_F11; break;
+					case XK_F12: e.keyboard.key = KEY_F12; break;
+
+					case XK_Super_L: e.keyboard.key = KEY_HOME; break;
+					case XK_Super_R: e.keyboard.key = KEY_HOME; break;
+
+					case XK_Alt_L: e.keyboard.key = KEY_ALT ;break;
+					case XK_Alt_R: e.keyboard.key = KEY_ALT ;break;
+
+					default:
+						print("Unknown Key: %s32\n", sym);
+					break;
+				}
+				if(e.keyboard.key)
+					ring_buffer_push(event_ring_buffer, e);
 			}break;
 			case XCB_CONFIGURE_NOTIFY:{
 				xcb_configure_notify_event_t *ce = (xcb_configure_notify_event_t*)event;
-				Event dst = {0};
-				dst.type = EVENT_WINDOW;
-				dst.window.type = WINDOW_RESIZE;
-				dst.window.width = ce->width;
-				dst.window.height = ce->height;
-				window->size = u32x2_set(ce->width, ce->height);
-				ring_buffer_push(event_ring_buffer, dst);
+				e.type = EVENT_WINDOW;
+				if(window->size.x != ce->width || window->size.y != ce->height)
+				{
+					e.window.type = WINDOW_RESIZE;
+					e.window.width = ce->width;
+					e.window.height = ce->height;
+					ring_buffer_push(event_ring_buffer, e);
+				}
+				if(window->position.x != ce->y || window->position.y != ce->x)
+				{
+					e.window.type = WINDOW_MOVE;
+					e.window.x = ce->x;
+					e.window.y = ce->y;
+					ring_buffer_push(event_ring_buffer, e);
+				}
+			}break;
+			case XCB_BUTTON_PRESS:
+			case XCB_BUTTON_RELEASE:
+			{
+				e.type = EVENT_MOUSE;
+				xcb_button_t button = 0;
+				if(response == XCB_BUTTON_PRESS)
+				{
+					xcb_button_press_event_t *be = (xcb_button_press_event_t*)event;
+					button = be->detail;
+					e.mouse.type = MOUSE_PRESS;
+				}
+				else
+				{
+					xcb_button_release_event_t *be = (xcb_button_release_event_t*)event;
+					button = be->detail;
+					e.mouse.type = MOUSE_RELEASE;
+				}
+				switch(button)
+				{
+					case XCB_BUTTON_INDEX_1: e.mouse.button = MOUSE_BUTTON_LEFT; break;
+					case XCB_BUTTON_INDEX_2: e.mouse.button = MOUSE_BUTTON_RIGHT; break;
+					case XCB_BUTTON_INDEX_3: e.mouse.button = MOUSE_BUTTON_MIDDLE; break;
+					case 8: e.mouse.button = MOUSE_BUTTON_BACK; break;
+					case 9: e.mouse.button = MOUSE_BUTTON_FORWARD; break;
+
+					case XCB_BUTTON_INDEX_4: e.mouse.button = MOUSE_BUTTON_SCROLL_POSITIVE; break;
+					case XCB_BUTTON_INDEX_5: e.mouse.button = MOUSE_BUTTON_SCROLL_NEGATIVE; break;
+					
+					default:
+						print("Unknown mouse button: %u8\n", button);
+					break;
+				}
+
+			}break;
+			case XCB_MOTION_NOTIFY:{
+				xcb_motion_notify_event_t *me = (xcb_motion_notify_event_t*)event;
+				e.type = EVENT_MOUSE;
+				e.mouse.type = MOUSE_MOVE;
+				e.mouse.x = me->event_x;
+				e.mouse.y = me->event_y;
 			}break;
 
 

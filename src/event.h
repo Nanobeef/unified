@@ -47,6 +47,8 @@ typedef enum{
     MOUSE_BUTTON_RIGHT,
     MOUSE_BUTTON_BACK,
     MOUSE_BUTTON_FORWARD,
+    MOUSE_BUTTON_SCROLL_POSITIVE,
+    MOUSE_BUTTON_SCROLL_NEGATIVE,
 }MouseButtonTypeFlags;
 typedef u32 MouseButtonType;
 
@@ -54,7 +56,6 @@ typedef struct{
     MouseEventType type;
     union{
         struct {s32 x,y;};
-        struct {s32 scroll;};
         MouseButtonType button;
     };
 }MouseEvent;
@@ -116,6 +117,12 @@ typedef enum{
     KEY_LEFT_SHIFT,
     KEY_RIGHT_SHIFT,
     KEY_GRAVE,
+	KEY_LEFT,
+	KEY_RIGHT,
+	KEY_UP,
+	KEY_DOWN,
+	KEY_HOME,
+	KEY_ALT,
     KEY_ESCAPE,
 }KeyTypeFlags;
 typedef u32 KeyType;
@@ -161,6 +168,7 @@ void print_event(Event event);
 
 typedef struct Button{
     b32 pressed;
+    b32 released;
     u64 press_time;
     u64 release_time;
     u64 action_time;
@@ -182,20 +190,29 @@ typedef struct Mouse{
 }Mouse;
 
 typedef struct{
+	Button first_button;
 	Button a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
 	Button n0,n1,n2,n3,n4,n5,n6,n7,n8,n9;
 	Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
 	Button left_control;
 	Button left_shift;
 
+	Button escape;
+
 	Button	left_mouse;
 	Button	right_mouse;
 	Button	middle_mouse;
+	Button  last_button;
+
+
 	Wheel	wheel;
 	Mouse	mouse;
 
-
+	b32 window_should_resize;
+	b32 application_should_stop;
 }PolledEvents;
+
+PolledEvents poll_events(Arena *arena, Event *event_ring_buffer);
 
 
 
