@@ -1,8 +1,6 @@
 
 
-#ifndef NO_INTRINSICS
-
-
+#if !defined(NO_INTRINSICS) && defined(AVX512_CORE)
 
 void test_collatz(Arena *arena)
 {

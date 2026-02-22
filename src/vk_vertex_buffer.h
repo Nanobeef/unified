@@ -17,4 +17,6 @@ GraphicsDeviceVertexBuffer create_graphics_device_vertex_buffer(GraphicsDeviceMe
 void destroy_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer vb);
 void graphics_device_vertex_buffer_push(GraphicsDeviceVertexBuffer *vb, u32 count, const Vertex2 *vertices);
 void graphics_device_vertex_buffer_push_indexed(GraphicsDeviceVertexBuffer *vb, u32 index_count, u32 *indices, u32 vertex_count, const Vertex2 *vertices);
+void reset_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
+void flush_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
 void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb);

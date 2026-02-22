@@ -1,6 +1,7 @@
 
 #define atomic _Atomic
 
+
 typedef struct{
 	pthread_mutex_t handle;
 }Mutex;
@@ -45,6 +46,7 @@ typedef struct Thread{
 	Print print;
 }Thread;
 
+
 typedef void*(PFN_Thread)(Thread*);
 typedef void*(PFN_Void)(void*);
 
@@ -55,3 +57,11 @@ void wait_for_thread(Thread *thread);
 b32 begin_thread_work(Thread *thread, PFN_Thread *function);
 Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function);
 Thread* current_thread(void);
+
+#if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
+#define thread_local __thread
+thread_local Thread *CURRENT_THREAD = NULL;
+#endif
+
+
+

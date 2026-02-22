@@ -53,11 +53,20 @@ void graphics_device_vertex_buffer_push_indexed(GraphicsDeviceVertexBuffer *vb, 
 	vb->index_count += index_count;
 }
 
+void reset_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb)
+{
+	vb->index_count = 0;
+	vb->vertex_count = 0;
+}
+
 void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb)
 {
-	u64 offset = (vb.vertex_total - vb.vertex_count) * vb.vertex_stride;
-	vkCmdBindIndexBuffer(cb.handle, vb.buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-	vkCmdBindVertexBuffers(cb.handle, 0,1, &vb.buffer.handle, &offset);
-	vkCmdDraw(cb.handle, vb.vertex_count, 1, 0, 0);
+	if(vb.vertex_count)
+	{
+		u64 offset = (vb.vertex_total - vb.vertex_count) * vb.vertex_stride;
+		vkCmdBindIndexBuffer(cb.handle, vb.buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindVertexBuffers(cb.handle, 0,1, &vb.buffer.handle, &offset);
+		vkCmdDraw(cb.handle, vb.vertex_count, 1, 0, 0);
+	}
 }
 

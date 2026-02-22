@@ -34,3 +34,29 @@ void free_graphics_device_memory(GraphicsDeviceMemory memory)
 	if(memory.handle)
 		vkFreeMemory(memory.heap->device->handle, memory.handle, vkb);
 }
+
+void flush_graphics_device_memory(GraphicsDeviceMemory memory)
+{
+	if(memory.mapping == NULL)
+		print("This memory has no mapping!\n");
+	VkMappedMemoryRange range = {
+		.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,		
+		.memory = memory.handle,
+		.offset = memory.offset,
+		.size = memory.size
+	};
+	vkFlushMappedMemoryRanges(memory.heap->device->handle, 1, &range);
+}
+
+void invalidate_graphics_device_memory(GraphicsDeviceMemory memory)
+{
+	if(memory.mapping == NULL)
+		print("This memory has no mapping!\n");
+	VkMappedMemoryRange range = {
+		.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,		
+		.memory = memory.handle,
+		.offset = memory.offset,
+		.size = memory.size
+	};
+	vkFlushMappedMemoryRanges(memory.heap->device->handle, 1, &range);
+}

@@ -231,7 +231,8 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	for(u32 i = 0; i < device->memory_heap_count; i++)
 	{
 		GraphicsDeviceMemoryHeap *heap = &device->memory_heaps[i];
-		if(heap->property_flags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+		VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		if((heap->property_flags & flags) == flags)
 		{
 			device->host_and_device_heap = heap;
 			break;
@@ -240,7 +241,8 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	for(u32 i = 0; i < device->memory_heap_count; i++)
 	{
 		GraphicsDeviceMemoryHeap *heap = &device->memory_heaps[i];
-		if(heap->property_flags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT))
+		VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		if((heap->property_flags & flags) == flags)
 		{
 			device->host_cached_heap = heap;
 			break;
@@ -249,7 +251,8 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	for(u32 i = 0; i < device->memory_heap_count; i++)
 	{
 		GraphicsDeviceMemoryHeap *heap = &device->memory_heaps[i];
-		if(heap->property_flags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+		VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		if((heap->property_flags & flags) == flags)
 		{
 			device->host_coherent_heap = heap;
 			break;

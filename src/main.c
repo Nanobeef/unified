@@ -80,6 +80,9 @@ void init(void)
 {
 	main_arena = allocate_arena(GiB(64));
 	main_thread = allocate_thread(main_arena, MiB(64));
+#if defined(thread_local)
+	CURRENT_THREAD = main_thread;
+#endif
 
 	thread_table = arena_push(main_arena, true, max_thread_count * sizeof(Thread*));
 	thread_table_mutex = create_mutex();
@@ -92,7 +95,6 @@ void cleanup(void)
 	exit(0);
 }
 
-
 s32 main(void)
 {
 	init();
@@ -101,7 +103,7 @@ s32 main(void)
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
 
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, DISCRETE_GRAPHICS_DEVICE);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
 
@@ -143,24 +145,29 @@ s32 main(void)
 	VkSampleCountFlags sample_count = VK_SAMPLE_COUNT_8_BIT;
 	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format);
 
-	GraphicsDeviceVertexBuffer vb = create_graphics_device_vertex_buffer(device->host_cached_heap, MiB(64), sizeof(Vertex2)); 
+	u64 triangle_count = 1000;
+	u64 vb_size = triangle_count * sizeof(Vertex2) * 3 + triangle_count * 3 * sizeof(u32);
+	GraphicsDeviceVertexBuffer vb = create_graphics_device_vertex_buffer(device->host_and_device_heap, vb_size, sizeof(Vertex2)); 
 	RomuQuad rq = romu_quad_seed(10032221);
+	Vertex2 *va = arena_push(main_arena, 0, sizeof(Vertex2) * 3 * triangle_count);
 	
-	for(u32 i = 0; i < 100000; i++)
+	for(u32 i = 0; i < triangle_count * 3; i+=3)
 	{
 		f32x2 point = romu_quad_f32x2(&rq);
-		f32 scale = 0.01;
+		f32 scale = 0.005;
 
 		Vertex2 vertices[3] = {
 			{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
 			{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
 			{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
 		};
+		va[i] =   vertices[0];
+		va[i+1] = vertices[1];
+		va[i+2] = vertices[2];
 
-		graphics_device_vertex_buffer_push(&vb, 3, vertices);
 	}
-
-
+	reset_graphics_device_vertex_buffer(&vb);
+	graphics_device_vertex_buffer_push(&vb, triangle_count * 3, va);
 	const u32 max_swapchain_image_count = 8;
 	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, target_images);
 	GraphicsDeviceImage *msaa_images = 0;
@@ -250,7 +257,9 @@ s32 main(void)
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
 			{
-				f32m3 m = f32m3_affine_scale(2.0, 2.0);
+				f32 aspect = (f32)swapchain.size.y / (f32)swapchain.size.x;
+				f32 scale = 0.9;
+				f32m3 m = f32m3_affine_scale(aspect * scale, scale);
 				f32m3p mp = f32m3_padding(m);
 				vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);

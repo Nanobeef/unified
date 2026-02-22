@@ -190,18 +190,20 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 					case XK_F11: e.keyboard.key = KEY_F11; break;
 					case XK_F12: e.keyboard.key = KEY_F12; break;
 
-					case XK_Super_L: e.keyboard.key = KEY_HOME; break;
-					case XK_Super_R: e.keyboard.key = KEY_HOME; break;
+					case XK_Super_L: e.keyboard.key = KEY_LEFT_HOME; break;
+					case XK_Super_R: e.keyboard.key = KEY_RIGHT_HOME; break;
 
-					case XK_Alt_L: e.keyboard.key = KEY_ALT ;break;
-					case XK_Alt_R: e.keyboard.key = KEY_ALT ;break;
+					case XK_Alt_L: e.keyboard.key = KEY_LEFT_ALT; break;
+					case XK_Alt_R: e.keyboard.key = KEY_RIGHT_ALT; break;
+					case XK_Return: e.keyboard.key = KEY_ENTER; break;
 
-					default:
+					default:{
 						print("Unknown Key: %s32\n", sym);
+						e.keyboard.key = KEY_NONE;
+					};
 					break;
 				}
-				if(e.keyboard.key)
-					ring_buffer_push(event_ring_buffer, e);
+				ring_buffer_push(event_ring_buffer, e);
 			}break;
 			case XCB_CONFIGURE_NOTIFY:{
 				xcb_configure_notify_event_t *ce = (xcb_configure_notify_event_t*)event;
@@ -240,19 +242,22 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 				}
 				switch(button)
 				{
-					case XCB_BUTTON_INDEX_1: e.mouse.button = MOUSE_BUTTON_LEFT; break;
-					case XCB_BUTTON_INDEX_2: e.mouse.button = MOUSE_BUTTON_RIGHT; break;
+					case XCB_BUTTON_INDEX_1: e.mouse.button = MOUSE_BUTTON_LEFT;  break;
+					case XCB_BUTTON_INDEX_2: e.mouse.button = MOUSE_BUTTON_RIGHT;  break;
 					case XCB_BUTTON_INDEX_3: e.mouse.button = MOUSE_BUTTON_MIDDLE; break;
 					case 8: e.mouse.button = MOUSE_BUTTON_BACK; break;
 					case 9: e.mouse.button = MOUSE_BUTTON_FORWARD; break;
 
-					case XCB_BUTTON_INDEX_4: e.mouse.button = MOUSE_BUTTON_SCROLL_POSITIVE; break;
-					case XCB_BUTTON_INDEX_5: e.mouse.button = MOUSE_BUTTON_SCROLL_NEGATIVE; break;
-					
+					case XCB_BUTTON_INDEX_4: e.mouse.button = MOUSE_BUTTON_SCROLL_POSITIVE; e.mouse.type = MOUSE_SCROLL; break;
+					case XCB_BUTTON_INDEX_5: e.mouse.button = MOUSE_BUTTON_SCROLL_NEGATIVE; e.mouse.type = MOUSE_SCROLL; break;
+					case 6: e.mouse.button = MOUSE_BUTTON_TRACKPAD_POSITIVE; e.mouse.type = MOUSE_PINCH; break;
+					case 7: e.mouse.button = MOUSE_BUTTON_TRACKPAD_NEGATIVE; e.mouse.type = MOUSE_PINCH; break;
 					default:
 						print("Unknown mouse button: %u8\n", button);
 					break;
 				}
+				if(e.mouse.type)
+					ring_buffer_push(event_ring_buffer, e);
 
 			}break;
 			case XCB_MOTION_NOTIFY:{
@@ -261,9 +266,8 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 				e.mouse.type = MOUSE_MOVE;
 				e.mouse.x = me->event_x;
 				e.mouse.y = me->event_y;
+				ring_buffer_push(event_ring_buffer, e);
 			}break;
-
-
 			default:
 			break;
 		}

@@ -23,17 +23,25 @@ typedef struct{
 }WindowEvent;
 
 typedef enum{
+	BUTTON_NONE = 0,
+	BUTTON_PRESS = 1,
+	BUTTON_RELEASE = 2,
+}ButtonEventTypeFlags;
+typedef u32 ButtonEventType;
+
+typedef enum{
     KEYBOARD_NONE = 0,
-    KEYBOARD_PRESS,
-    KEYBOARD_RELEASE,
+    KEYBOARD_PRESS = 1,
+    KEYBOARD_RELEASE = 2,
 }KeyboardEventTypeFlags;
 typedef u32 KeyboardEventType;
 
 typedef enum{
-    MOUSE_NONE,
-    MOUSE_PRESS,
-    MOUSE_RELEASE,
+    MOUSE_NONE = 0,
+    MOUSE_PRESS = 1,
+    MOUSE_RELEASE = 2,
     MOUSE_SCROLL,
+	MOUSE_PINCH,
     MOUSE_MOVE,
     MOUSE_ENTER,
     MOUSE_LEAVE,
@@ -49,6 +57,8 @@ typedef enum{
     MOUSE_BUTTON_FORWARD,
     MOUSE_BUTTON_SCROLL_POSITIVE,
     MOUSE_BUTTON_SCROLL_NEGATIVE,
+    MOUSE_BUTTON_TRACKPAD_POSITIVE,
+    MOUSE_BUTTON_TRACKPAD_NEGATIVE,
 }MouseButtonTypeFlags;
 typedef u32 MouseButtonType;
 
@@ -121,8 +131,11 @@ typedef enum{
 	KEY_RIGHT,
 	KEY_UP,
 	KEY_DOWN,
-	KEY_HOME,
-	KEY_ALT,
+	KEY_LEFT_ALT,
+	KEY_RIGHT_ALT,
+	KEY_LEFT_HOME,
+	KEY_RIGHT_HOME,
+	KEY_ENTER,
     KEY_ESCAPE,
 }KeyTypeFlags;
 typedef u32 KeyType;
@@ -176,9 +189,9 @@ typedef struct Button{
 }Button;
 
 typedef struct Wheel{
-	s64 accum;
-	s64 action;
-	u64 action_time;
+	f64 accum;
+	f64 velocity;
+	u64 time;
 	struct Wheel *previous;
 }Wheel;
 
@@ -186,24 +199,28 @@ typedef struct Mouse{
 	u64 move_time;	
 	f32x2 pixel_position;
 	f32x2 pixel_delta;
+	u64 scroll_time;
 	struct Mouse *previous;
 }Mouse;
 
 typedef struct{
-	Button first_button;
+   Button first_button;
 	Button a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
 	Button n0,n1,n2,n3,n4,n5,n6,n7,n8,n9;
 	Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
-	Button left_control;
-	Button left_shift;
-
+	Button left_control, right_control, control;
+	Button left_shift, right_shift, shift;
+	Button left_alt, right_alt, alt;
+	Button left,right,up,down;
+	Button enter;
+	Button grave;
 	Button escape;
-
 	Button	left_mouse;
 	Button	right_mouse;
 	Button	middle_mouse;
-	Button  last_button;
-
+	Button  back_mouse;
+	Button  forward_mouse;
+   Button  last_button;
 
 	Wheel	wheel;
 	Mouse	mouse;
@@ -213,15 +230,4 @@ typedef struct{
 }PolledEvents;
 
 PolledEvents poll_events(Arena *arena, Event *event_ring_buffer);
-
-
-
-
-
-
-
-
-
-
-
 

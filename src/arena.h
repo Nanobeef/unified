@@ -22,6 +22,7 @@ void* arena_push_aligned(Arena *arena, u64 size, u64 alignment);
 void arena_pop(Arena *arena, u64 size);
 void arena_set(Arena *arena, u64 pos);
 Scratch find_scratch(struct Thread *thread, u32 conflict_count, Arena **conflicts);
+Scratch force_scratch(u32 index);
 void regress_scratch(Scratch scratch);
 
 #define arena_push_type( ARENA, ZERO, COUNT , TYPE , NAME) TYPE* NAME = (TYPE*)arena_push(ARENA, ZERO, (COUNT) * sizeof(TYPE));

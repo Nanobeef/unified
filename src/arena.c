@@ -14,7 +14,8 @@ Arena *init_arena(u64 size, void *data)
 Arena* allocate_arena(u64 size)
 {
 	size = ForwardAlign(size, 4096);
-	void *data = malloc(size);
+	void *data = NULL;
+	while((data = malloc(size)) == NULL){size>>=1;}
 	Arena *arena = init_arena(size, data);
 	return arena;
 }
@@ -77,6 +78,15 @@ Scratch find_scratch(struct Thread *thread, u32 conflict_count, Arena **conflict
 	if(scratch.arena == 0)
 		printf("Scratch arena is ZERO!!!\n");
 	scratch.regress = scratch.arena->pos;
+	return scratch;
+}
+Scratch force_scratch(u32 index)
+{
+	Arena *arena = current_thread()->scratch_arenas[index];
+	Scratch scratch = {
+		.arena = arena,
+		.regress = arena->pos,
+	};
 	return scratch;
 }
 void regress_scratch(Scratch scratch)

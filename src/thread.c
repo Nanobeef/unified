@@ -86,6 +86,9 @@ void* end_thread_work(Thread *thread)
 void *thread_wrapper(void *args)
 {
 	Thread *thread = args;
+#if defined(thread_local)
+	CURRENT_THREAD = thread;
+#endif
 	while(true)
 	{
 		lock_mutex(&thread->mutex);
@@ -127,7 +130,7 @@ Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size)
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setstacksize(&attr, stack_size);
-
+#if !defined(thread_local)
 	lock_mutex(&thread_table_mutex);
 	for(u32 i = 0; i < max_thread_count; i++)
 	{
@@ -142,9 +145,9 @@ Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size)
 	printf("Too many threads in global array!\n");
 	pthread_attr_destroy(&attr);
 	return 0;
-
 FOUND:
 	unlock_mutex(&thread_table_mutex);
+#endif
 
 	if(pthread_create(&thread->handle, &attr, thread_wrapper, (void*)thread))
 	{
@@ -208,6 +211,13 @@ Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_T
 	return thread;
 }
 
+
+#if defined(COMPILER_GCC) || defined(COMPILER_CLANG)
+Thread *current_thread(void)
+{
+	return CURRENT_THREAD;	
+}
+#else
 Thread* current_thread(void)
 {
 	pthread_t handle = pthread_self();
@@ -232,3 +242,4 @@ Thread* current_thread(void)
 	}
 	return 0;
 }
+#endif

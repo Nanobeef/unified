@@ -30,3 +30,4 @@ void destroy_graphics_device_buffer(GraphicsDeviceBuffer buffer)
 	free_graphics_device_memory(buffer.memory);
 	vkDestroyBuffer(buffer.device->handle, buffer.handle, vkb);
 }
+
