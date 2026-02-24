@@ -12,7 +12,7 @@ void main()
 {
 	if(in_texture.x != 0.0)
 	{
-		float c = texture(glyph_cache, in_texture).r;
+		float c = textureLod(glyph_cache, in_texture, 0).r;
 		out_color = vec4(c) * in_color;
 	}
 	else

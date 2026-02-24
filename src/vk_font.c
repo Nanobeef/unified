@@ -15,7 +15,7 @@ GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, Graphic
 	GraphicsDeviceImage linear_image = create_graphics_device_image_explicit(
 		device->host_and_device_heap, u32x2_set(2048, 4096),
 		VK_FORMAT_R8_UNORM,  VK_IMAGE_USAGE_SAMPLED_BIT,
-		VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT
+		VK_IMAGE_TILING_LINEAR, VK_SAMPLE_COUNT_1_BIT
 	);
 
 	arena_push_type(arena, 0, 1, GraphicsDeviceFontCache, cache);
@@ -118,13 +118,19 @@ GraphicsDeviceGlyph *load_graphics_device_glyph(GraphicsDeviceFontCache *cache, 
 
 void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 {
-	flush_graphics_device_memory(cache->linear_image.memory);
 	RomuQuad rq = romu_quad_seed(get_epoch_ms());
-	for(u32 i = 0; i < cache->linear_image.size.x * cache->linear_image.size.y; i++)
+	u32x2 size = cache->linear_image.size;
+	size = u32x2_set1(2048);
+
+	u8 *data = cache->linear_image.memory.mapping;
+	for(u32 y = 0; y < size.y; y++)
 	{
-		u8 *data = cache->linear_image.memory.mapping;
-		data[i] = romu_quad(&rq);
+		for(u32 x = 0; x < size.x; x++)
+		{
+			data[y * cache->linear_image.size.x + x] = (u8)romu_quad(&rq);
+		}
 	}
+	flush_graphics_device_memory(cache->linear_image.memory);
 }
 
 

@@ -293,9 +293,10 @@ s32 main(void)
 					{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
 					{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
 				};
+				f32 image_size = 2048;
 				vertices[0].texture = f32x2_set(0.0, 0.0);
-				vertices[1].texture = f32x2_set(1.0, 0.0);
-				vertices[2].texture = f32x2_set(1.0, 1.0);
+				vertices[1].texture = f32x2_set(image_size, 0.0);
+				vertices[2].texture = f32x2_set(image_size, image_size);
 				graphics_device_vertex_buffer_push(vb, 3, vertices);
 			}
 		}
