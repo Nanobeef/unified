@@ -96,3 +96,4 @@ void destroy_graphics_semaphores(u32 count, GraphicsSemaphore *semaphores)
 {
 	for(u32 i = 0; i < count; i++){destroy_graphics_semaphore(semaphores[i]);}
 }
+

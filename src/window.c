@@ -14,6 +14,25 @@ Window *create_window(Arena *arena)
 	xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
 	xcb_screen_t *screen = iter.data;
 
+	u32x2 screen_size_in_mm = u32x2_set(
+		screen->width_in_millimeters,
+		screen->height_in_millimeters
+	);
+	u32x2 screen_size_in_pixels = u32x2_set(
+		screen->width_in_pixels,
+		screen->height_in_pixels
+	);
+
+	f32 mm_per_inch = 25.4;
+	f32x2 screen_dpi = f32x2_set1(96.0);
+	if((screen_size_in_mm.x != 0) && (screen_size_in_mm.y != 0))
+	{
+		screen_dpi = f32x2_set(
+			screen_size_in_pixels.x * mm_per_inch / screen_size_in_mm.x,
+			screen_size_in_pixels.y * mm_per_inch / screen_size_in_mm.y
+		);
+	}
+
 	if(0){
 
 	xcb_visualid_t visual = 0;
@@ -91,6 +110,9 @@ Window *create_window(Arena *arena)
 		.handle = handle,
 		.key_symbols = key_symbols,
 		.size = size,
+		.screen_size_in_mm = screen_size_in_mm,
+		.screen_size_in_pixels = screen_size_in_pixels,
+		.screen_dpi = screen_dpi,
 	};
 
 	return window;
@@ -266,6 +288,14 @@ u32 poll_window(Window *window, Event *event_ring_buffer)
 				e.mouse.type = MOUSE_MOVE;
 				e.mouse.x = me->event_x;
 				e.mouse.y = me->event_y;
+				ring_buffer_push(event_ring_buffer, e);
+			}break;
+			case XCB_ENTER_NOTIFY:{
+				xcb_enter_notify_event_t *en = (xcb_enter_notify_event_t*)event;
+				e.type = EVENT_MOUSE;
+				e.mouse.type = MOUSE_ENTER;
+				e.mouse.x = en->event_x;
+				e.mouse.y = en->event_y;
 				ring_buffer_push(event_ring_buffer, e);
 			}break;
 			default:

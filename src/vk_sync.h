@@ -30,4 +30,3 @@ GraphicsSemaphore* create_graphics_semaphores(Arena *arena, GraphicsDevice *devi
 void destroy_graphics_semaphore(GraphicsSemaphore semaphore);
 void destroy_graphics_semaphores(u32 count, GraphicsSemaphore *semaphores);
 
-

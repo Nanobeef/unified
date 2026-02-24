@@ -65,6 +65,13 @@ u64 memprint(Arena *conflict, u64 size, u8* buffer, const char *format, ...)
 	return len;
 }
 
+typedef u64 EpochTimeNS;
+typedef u64 EpochTimeUS;
+typedef u64 EpochTimeMS;
+typedef u64 EpochTimeS;
+typedef u64 EpochTime;
+
+typedef u64 Time;
 
 typedef enum{
 	PRINT_KEYWORD_NONE,
@@ -81,10 +88,20 @@ typedef enum{
 
 	PRINT_KEYWORD_u32x2,	
 	PRINT_KEYWORD_s32x2,	
+	PRINT_KEYWORD_f32x2,	
 
 	PRINT_KEYWORD_String8,
 	PRINT_KEYWORD_Cstring,
-	PRINT_KEYWORD_void_pointer
+
+	PRINT_KEYWORD_Time,
+
+	PRINT_KEYWORD_EpochTime,
+	PRINT_KEYWORD_EpochTimeNS,
+	PRINT_KEYWORD_EpochTimeUS,
+	PRINT_KEYWORD_EpochTimeMS,
+	PRINT_KEYWORD_EpochTimeS,
+
+	PRINT_KEYWORD_void_pointer,
 }PrintKeywordFlags;
 typedef u32 PrintKeywordIndex;
 
@@ -113,8 +130,15 @@ PrintKeyword keywords[] = {
 	p1(f64),
 	p1(u32x2),
 	p1(s32x2),
+	p1(f32x2),
 	p2(s, String8),
 	p2(cs, Cstring),
+	p2(et, EpochTime),
+	p2(ets, EpochTimeS),
+	p2(etms, EpochTimeMS),
+	p2(etus, EpochTimeUS),
+	p2(etns, EpochTimeNS),
+	p2(t, Time),
 };
 #undef pk
 
@@ -173,6 +197,10 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		s32x2 d = *(s32x2*)data;
 		len = snprintf((char*)dst, size, "(%d %d)", d.x, d.y);
 	}break;
+	case PRINT_KEYWORD_f32x2:{
+		f32x2 d = *(f32x2*)data;
+		len = snprintf((char*)dst, size, "(%f %f)", d.x, d.y);
+	}break;
 	case PRINT_KEYWORD_String8:{
 		String8 d = *(String8*)data;
 		u32 i = 0;
@@ -187,6 +215,46 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 			dst[i] = d[i];
 		len = i;
 	}break;
+	case PRINT_KEYWORD_EpochTimeNS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu ns", d);
+	}break;
+	case PRINT_KEYWORD_EpochTimeUS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu us", d);
+	}break;
+	case PRINT_KEYWORD_EpochTimeMS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu ms", d);
+	}break;
+	case PRINT_KEYWORD_EpochTimeS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu s", d);
+	}break;
+	case PRINT_KEYWORD_Time:{
+		u64 d = *(u64*)data;
+		if(d < 1000)
+		{
+			len = snprintf((char*)dst, size, "%lu ns", (u64)d);
+		}
+		else if(d < 1000000)
+		{
+			len = snprintf((char*)dst, size, "%lu us", (u64)d/1000);
+		}
+		else if(d < 1000000000lu * 10lu)
+		{
+			len = snprintf((char*)dst, size, "%lu ms", (u64)d/1000000);
+		}
+		else if(d < 1000000000lu * 600lu)
+		{
+			len = snprintf((char*)dst, size, "%lu s", (u64)d/1000000000);
+		}
+		else
+		{
+			len = snprintf((char*)dst, size, "%lu m", (u64)d/(1000000000lu * 60lu));
+		}
+	}break;
+
 		default:
 		break;
 	}
@@ -238,8 +306,16 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 		f64 d = va_arg(l, f64);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
+	case PRINT_KEYWORD_u32x2:{
+		u32x2 d = va_arg(l, u32x2);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
 	case PRINT_KEYWORD_s32x2:{
 		s32x2 d = va_arg(l, s32x2);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_f32x2:{
+		f32x2 d = va_arg(l, f32x2);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
 	case PRINT_KEYWORD_String8:{
@@ -250,6 +326,31 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 		const char* d = va_arg(l, const char*);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
+	case PRINT_KEYWORD_EpochTimeNS:{
+		u64 t = get_epoch_ns();
+		len = keyword_to_buffer(size, dst, index, &t);
+	}break;
+	case PRINT_KEYWORD_EpochTimeUS:{
+		u64 t = get_epoch_us();
+		len = keyword_to_buffer(size, dst, index, &t);
+	}break;
+	case PRINT_KEYWORD_EpochTimeMS:{
+		u64 t = get_epoch_ms();
+		len = keyword_to_buffer(size, dst, index, &t);
+	}break;
+	case PRINT_KEYWORD_EpochTimeS:{
+		u64 t = get_epoch_s();
+		len = keyword_to_buffer(size, dst, index, &t);
+	}break;
+	case PRINT_KEYWORD_EpochTime:{
+		u64 t = get_epoch_ms();
+		len = keyword_to_buffer(size, dst, PRINT_KEYWORD_EpochTimeMS, &t);
+	}break;
+	case PRINT_KEYWORD_Time:{
+		u64 d = va_arg(l, u64);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+
 		default:
 		break;
 	}

@@ -1,6 +1,6 @@
 
 
-GraphicsDeviceVertexBuffer create_graphics_device_vertex_buffer(GraphicsDeviceMemoryHeap* heap, u64 size, u64 vertex_stride)
+GraphicsDeviceVertexBuffer create_graphics_device_vertex_buffer(GraphicsDeviceMemoryHeap* heap, u64 size, u64 vertex_stride, GraphicsDeviceFontCache *font_cache)
 {
 	size = (size / (u64)vertex_stride) * vertex_stride;
 	GraphicsDeviceVertexBuffer vb = {
@@ -8,6 +8,7 @@ GraphicsDeviceVertexBuffer create_graphics_device_vertex_buffer(GraphicsDeviceMe
 		.vertex_stride = vertex_stride,
 		.index_stride = sizeof(u32),
 		.vertex_total = size / vertex_stride,
+		.font_cache = font_cache,
 	};
 	vb.buffer = create_graphics_device_buffer(heap, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 	vb.data = vb.buffer.memory.mapping;

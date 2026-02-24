@@ -9,6 +9,10 @@ typedef struct{
 	u32x2 size;
 	u32x2 position;
 
+	u32x2 screen_size_in_mm;
+	u32x2 screen_size_in_pixels;
+	f32x2 screen_dpi;
+
 
 }Window;
 

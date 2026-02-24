@@ -188,12 +188,17 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		};
 
+		VkDescriptorSetLayoutBinding bindings[] = {
+			{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &pipelines.mono_sampler},
+		};
+		pipelines.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
+
 		VkPipelineLayoutCreateInfo info = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 			.pushConstantRangeCount = 1,
 			.pPushConstantRanges = &range,
-			//.setLayoutCount = 1,
-			//.pSetLayouts = &pipelines.descriptor_set_layout,
+			.setLayoutCount = 1,
+			.pSetLayouts = &pipelines.descriptor_set_layout.handle,
 		};
 		VK_ASSERT(vkCreatePipelineLayout(device->handle, &info, vkb, &pipelines.layout));
 	}
@@ -450,6 +455,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 void destroy_rasterization_pipelines(RasterizationPipelines pipelines)
 {
 	GraphicsDevice *device = pipelines.device;
+	destroy_graphics_descriptor_set_layout(pipelines.descriptor_set_layout);
 	vkDestroyRenderPass(device->handle, pipelines.render_pass, vkb);
 	vkDestroySampler(device->handle, pipelines.mono_sampler, vkb);
 	vkDestroyPipeline(device->handle, pipelines.vertex2, vkb);

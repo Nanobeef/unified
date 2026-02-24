@@ -189,16 +189,19 @@ typedef struct Button{
 }Button;
 
 typedef struct Wheel{
+	b32 moved;
 	f64 accum;
-	f64 velocity;
+	f32 velocity;
 	u64 time;
 	struct Wheel *previous;
 }Wheel;
 
 typedef struct Mouse{
 	u64 move_time;	
+	f32x2 previous_pixel_position;
 	f32x2 pixel_position;
 	f32x2 pixel_delta;
+	b32 moved;
 	u64 scroll_time;
 	struct Mouse *previous;
 }Mouse;

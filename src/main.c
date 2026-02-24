@@ -21,11 +21,14 @@
 #include <xcb/xproto.h>
 #include <X11/keysym.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "window.h"
 #include "vk_instance.h"
 #include "vk_device.h"
-#include "vk_sync.h"
 #include "vk_command.h"
+#include "vk_sync.h"
 #include "vk_memory.h"
 #include "vk_image.h"
 #include "vk_buffer.h"
@@ -33,14 +36,14 @@
 #include "vk_surface.h"
 #include "vk_swapchain.h"
 #include "vk_queue.h"
+#include "vk_descriptor.h"
 #include "vk_rasterize.h"
 #include "vk_pipeline.h"
 #include "camera.h"
 #include "random.h"
+#include "vk_font.h"
 #include "vk_vertex_buffer.h"
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
 
 #include "vk_instance.c"
 #include "vk_device.c"
@@ -57,12 +60,15 @@
 #include "camera.c"
 #include "random.c"
 #include "vk_vertex_buffer.c"
+#include "vk_font.c"
+#include "vk_descriptor.c"
 
 Arena *main_arena;
 Thread *main_thread;
 Mutex thread_table_mutex;
 u32 max_thread_count = 1024;
 Thread **thread_table;
+u64 epoch_time_ns;
 
 #include "vector.c"
 #include "string.c"
@@ -78,6 +84,7 @@ Thread **thread_table;
 
 void init(void)
 {
+	epoch_time_ns = get_time_ns();
 	main_arena = allocate_arena(GiB(64));
 	main_thread = allocate_thread(main_arena, MiB(64));
 #if defined(thread_local)
@@ -103,7 +110,7 @@ s32 main(void)
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
 
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, 1);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
 
@@ -114,7 +121,7 @@ s32 main(void)
 	arena_push_type(main_arena, 0, frame_count * 2, Arena*, frame_arenas);
 	for(u32 i = 0; i < frame_count * 2; i++)
 	{
-		u64 size = MiB(8);
+		u64 size = MiB(64);
 		frame_arenas[i] = init_arena(size, arena_push(main_arena, 0, size));
 	}
 
@@ -137,37 +144,28 @@ s32 main(void)
 
 	GraphicsFence *render_fences = create_graphics_fences(main_arena, device, frame_count, true);
 
-	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
+	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 2);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
+
+	GraphicsEvent *font_cache_events = create_graphics_events(main_arena, device, frame_count);
 
 
 	VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
 	VkSampleCountFlags sample_count = VK_SAMPLE_COUNT_8_BIT;
 	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format);
 
-	u64 triangle_count = 1000;
-	u64 vb_size = triangle_count * sizeof(Vertex2) * 3 + triangle_count * 3 * sizeof(u32);
-	GraphicsDeviceVertexBuffer vb = create_graphics_device_vertex_buffer(device->host_and_device_heap, vb_size, sizeof(Vertex2)); 
-	RomuQuad rq = romu_quad_seed(10032221);
-	Vertex2 *va = arena_push(main_arena, 0, sizeof(Vertex2) * 3 * triangle_count);
-	
-	for(u32 i = 0; i < triangle_count * 3; i+=3)
+	GraphicsDeviceFontCache *font_cache = create_graphics_device_font_cache(main_arena, device);
+	u8* berkeley_mono_file = read_file(main_arena, str8_lit(BERKELEY_PATH));
+	GraphicsDeviceFont *berkeley_mono_font = create_graphics_device_font(main_arena, berkeley_mono_file, font_cache);
+
+	u64 max_triangle_count = 1000000;
+	u64 triangle_count = 10000;
+	u64 vb_size = triangle_count * sizeof(Vertex2) * 3 + max_triangle_count * 3 * sizeof(u32);
+	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceVertexBuffer, world_vertex_buffers);
+	for(u32 i = 0; i < frame_count; i++)
 	{
-		f32x2 point = romu_quad_f32x2(&rq);
-		f32 scale = 0.005;
-
-		Vertex2 vertices[3] = {
-			{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
-			{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
-			{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul1(romu_quad_f32x2(&rq), scale))},
-		};
-		va[i] =   vertices[0];
-		va[i+1] = vertices[1];
-		va[i+2] = vertices[2];
-
+		world_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, vb_size, sizeof(Vertex2), font_cache);
 	}
-	reset_graphics_device_vertex_buffer(&vb);
-	graphics_device_vertex_buffer_push(&vb, triangle_count * 3, va);
 	const u32 max_swapchain_image_count = 8;
 	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, target_images);
 	GraphicsDeviceImage *msaa_images = 0;
@@ -181,20 +179,58 @@ s32 main(void)
 	}
 	VkFramebuffer *framebuffers = create_rasterization_framebuffers(resize_arena, rasterization_pipelines, swapchain.image_count, target_images, msaa_images);
 
+	arena_push_type(main_arena, 0, frame_count, GraphicsDescriptorPool*, frame_descriptor_pools);
+	for(u32 i = 0; i < frame_count; i++)
+	{
+		frame_descriptor_pools[i] = create_graphics_descriptor_pool(main_arena, device, 1, &rasterization_pipelines.descriptor_set_layout);
+		VkDescriptorImageInfo image_info = {
+			.imageView = font_cache->linear_image.view,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+		VkWriteDescriptorSet write = {
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.dstSet = frame_descriptor_pools[i]->descriptor_sets[0].handle,
+			.dstBinding = 0,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.pImageInfo = &image_info,
+		};
+		vkUpdateDescriptorSets(device->handle, 1, &write, 0, 0);
+	}
+
+
+	Camera camera = init_camera();
+
+
+	u64 desired_frame_time = 1000000000/144;
+	u64 start_time = get_time_ns();;
+	u64 end_time = 0;
+	u64 elapsed_time = 0;
 	while(true)
 	{
+		end_time = get_time_ns();
+		elapsed_time = end_time - start_time;
+		if(elapsed_time < desired_frame_time)
+		{
+			u64 time = desired_frame_time - elapsed_time;
+			usleep(time / 1000);
+		}
+		start_time = get_time_ns();
+		
 		frame_index = frame_accum % frame_count;
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
+		reset_arena(frame_arena);
 
 		poll_window(window, event_ring_buffer);
 		PolledEvents pe = poll_events(frame_arena, event_ring_buffer);
 		if(pe.escape.pressed)
 			break;
 
+		update_camera(&camera, pe, window->size, false);
+
 		u32 image_index = 0;
 		GraphicsDeviceImage swapchain_image = swapchain.images[image_index];
 		GraphicsDeviceImage target_image = target_images[image_index];
-
 		{
 			VkResult result = vkAcquireNextImageKHR(device->handle, swapchain.handle, U64_MAX, swapchain_semaphores[frame_index].handle, 0, &swapchain.image_index);
 			if(pe.window_should_resize || (result != VK_SUCCESS))
@@ -233,12 +269,65 @@ s32 main(void)
 			image_index = swapchain.image_index;
 			swapchain_image = swapchain.images[image_index];
 			target_image = target_images[image_index];
+
 		}
 
 		{
-			wait_and_reset_graphics_fence(render_fences[frame_index]);
-			GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
-			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+			GraphicsDeviceVertexBuffer *vb = world_vertex_buffers + frame_index;
+			RomuQuad rq = romu_quad_seed(10032221);
+//			Vertex2 *va = arena_push(frame_arena, 0, sizeof(Vertex2) * 3 * triangle_count);
+			reset_graphics_device_vertex_buffer(vb);
+			
+			for(u32 i = 0; i < triangle_count * 3; i+=3)
+			{
+				f32x2 point = romu_quad_f32x2(&rq);
+				point = f32x2_mul1(point, 100.0f);
+				f32 t = (f32)(get_time_ms() % 6283) / 1000.0f;
+				f32 scale = sinf(t * 6.0) * 0.02 + 0.1 + 1;
+				f32m2 rotate = f32m2_rotate(t * 3.0);
+				rotate = f32m2_mul(rotate, f32m2_scale(scale, scale));
+				rotate = f32m2_identity();
+
+				Vertex2 vertices[3] = {
+					{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+				};
+				vertices[0].texture = f32x2_set(0.0, 0.0);
+				vertices[1].texture = f32x2_set(1.0, 0.0);
+				vertices[2].texture = f32x2_set(1.0, 1.0);
+				graphics_device_vertex_buffer_push(vb, 3, vertices);
+			}
+		}
+
+		wait_and_reset_graphics_fence(render_fences[frame_index]);
+		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
+
+		{
+			resolve_graphics_device_font_cache(font_cache);
+		}
+			
+		{
+			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[1]);
+			vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 1, &frame_descriptor_pools[frame_index]->descriptor_sets[0].handle, 0,0);
+
+			{
+				GraphicsImageMemoryBarrier image_barrier = {
+					.image = font_cache->linear_image,
+					.old_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					.src_access = VK_ACCESS_HOST_WRITE_BIT,
+					.dst_access = VK_ACCESS_SHADER_READ_BIT,
+				};
+
+				GraphicsPipelineBarrier barrier = {
+					.image_memory_barrier_count = 1,
+					.image_memory_barriers = &image_barrier,
+					.src_stage = VK_PIPELINE_STAGE_HOST_BIT,
+					.dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				};
+				cmd_graphics_pipeline_barrier(cb, barrier);
+			}
 
 			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.01, 0.01, 0.01, 1.0));
 			{
@@ -257,13 +346,10 @@ s32 main(void)
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
 			{
-				f32 aspect = (f32)swapchain.size.y / (f32)swapchain.size.x;
-				f32 scale = 0.9;
-				f32m3 m = f32m3_affine_scale(aspect * scale, scale);
-				f32m3p mp = f32m3_padding(m);
+				f32m3p mp = f32m3_padding(camera.current_affine);
 				vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
-				cmd_draw_graphics_device_vertex_buffer(cb, vb);
+				cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
 			}
 			vkCmdEndRenderPass(cb.handle);
 
@@ -325,6 +411,7 @@ s32 main(void)
 	}
 	vkDeviceWaitIdle(device->handle);
 
+
 	for(u32 i = 0; i < swapchain.image_count; i++)
 	{
 		vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
@@ -333,7 +420,13 @@ s32 main(void)
 			destroy_graphics_device_image(msaa_images[i]);
 			
 	}
-	destroy_graphics_device_vertex_buffer(vb);
+	destroy_graphics_device_font_cache(font_cache);
+	for(u32 i = 0; i < frame_count; i++)
+	{
+		destroy_graphics_descriptor_pool(frame_descriptor_pools[i]);
+		destroy_graphics_device_vertex_buffer(world_vertex_buffers[i]);
+	}
+	destroy_graphics_events(frame_count, font_cache_events);
 
 	destroy_rasterization_pipelines(rasterization_pipelines);
 	destroy_graphics_semaphores(frame_count, swapchain_semaphores);

@@ -19,5 +19,15 @@ typedef struct{
 	u64 dst_time;
 	u64 current_time;
 	
+	f32 aspect;
+	f32 zoom_sensitivity;
+
+
+	u64 transition_time;
+	u64 transition_start;
+	u64 transition_end;
+	b32 transition;
 
 }Camera;
+
+void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force_disable);

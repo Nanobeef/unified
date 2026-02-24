@@ -27,3 +27,19 @@ u64 get_time_s(void)
 	return (u64)ts.tv_sec;
 }
 
+u64 get_epoch_ns(void)
+{
+	return get_time_ns() - epoch_time_ns;
+}
+u64 get_epoch_us(void)
+{
+	return (get_time_ns() - epoch_time_ns) / 1000;
+}
+u64 get_epoch_ms(void)
+{
+	return (get_time_ns() - epoch_time_ns) / 1000000;
+}
+u64 get_epoch_s(void)
+{
+	return (get_time_ns() - epoch_time_ns) / 1000000000;
+}

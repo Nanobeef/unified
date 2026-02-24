@@ -41,7 +41,8 @@ void press_mouse_button(Arena *arena, Button *b, u64 time, MouseEventType action
 
 void move_wheel(Arena *arena, Wheel *w, u64 time, f64 val)
 {
-	if(w->velocity != 0.0)
+	w->moved = true;
+	if(w->velocity != 0.0 && 0)
 	{
 		Wheel *p = w->previous;
 		w->previous = arena_push(arena, 0, sizeof(Wheel));
@@ -50,7 +51,7 @@ void move_wheel(Arena *arena, Wheel *w, u64 time, f64 val)
 	}
 	w->time = time;	
 	w->accum += val;
-	w->velocity = val;
+	w->velocity += val;
 }
 
 PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
@@ -61,6 +62,16 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 		Button *b = &pe.first_button + 1;
 		b->previous = 0;
 	}
+
+	pe.mouse.previous_pixel_position = pe.mouse.pixel_position;
+	pe.mouse.moved = false;
+	pe.mouse.previous = 0;
+	pe.mouse.previous_pixel_position = pe.mouse.pixel_position;
+
+	pe.wheel.moved = false;
+	pe.wheel.previous = 0;
+	pe.wheel.velocity = 0.0f;
+
 	pe.window_should_resize = false;
 	pe.application_should_stop = false;
 	Event e;
@@ -91,6 +102,8 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 			case EVENT_MOUSE:{
 				switch(e.mouse.type)
 				{
+					case MOUSE_ENTER:
+					break;
 					case MOUSE_PRESS:
 					case MOUSE_RELEASE:
 					switch(e.mouse.button)
@@ -102,7 +115,6 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 						case MOUSE_BUTTON_FORWARD: press_mouse_button(arena, &pe.forward_mouse, e.time, e.mouse.type); break;
 						default:break;
 					}
-					default:
 					break;
 					case MOUSE_SCROLL:
 						switch(e.mouse.button)
@@ -111,6 +123,7 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 							case MOUSE_BUTTON_SCROLL_NEGATIVE: move_wheel(arena, &pe.wheel, e.time, -0.5); break;
 							default:break;
 						}
+					break;
 					case MOUSE_PINCH:
 					{
 						switch(e.mouse.button)
@@ -121,7 +134,27 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 						}
 					}
 					break;
-				}
+					case MOUSE_MOVE:{
+						if(pe.mouse.previous)
+						{
+							Mouse *p = arena_push(arena, 0, sizeof(Mouse));
+							p->previous = p;
+							p->previous[0] = pe.mouse;
+						}	
+						else
+						{
+							pe.mouse.previous = (void*)1;
+						}
+						pe.mouse.moved = true;
+						pe.mouse.move_time = e.time;
+						pe.mouse.pixel_position.x = (f32)e.mouse.x;
+						pe.mouse.pixel_position.y = (f32)e.mouse.y;
+						pe.mouse.pixel_delta = f32x2_sub(pe.mouse.previous_pixel_position, pe.mouse.pixel_position);
+
+					}break;
+					default:
+					break;
+				}break;
 			}break;;
 			case EVENT_KEYBOARD:{
 				switch(e.keyboard.key)
