@@ -102,6 +102,9 @@ void cleanup(void)
 	exit(0);
 }
 
+
+
+
 s32 main(void)
 {
 	init();
@@ -144,7 +147,7 @@ s32 main(void)
 
 	GraphicsFence *render_fences = create_graphics_fences(main_arena, device, frame_count, true);
 
-	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 2);
+	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
 
 	GraphicsEvent *font_cache_events = create_graphics_events(main_arena, device, frame_count);
@@ -198,8 +201,40 @@ s32 main(void)
 		vkUpdateDescriptorSets(device->handle, 1, &write, 0, 0);
 	}
 
-
 	Camera camera = init_camera();
+
+	{
+		wait_and_reset_graphics_fence(render_fences[frame_index]);
+		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
+		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+		{
+			GraphicsImageMemoryBarrier image_barrier = {
+				.image = font_cache->linear_image,
+				.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.src_access = VK_ACCESS_NONE,
+				.dst_access = VK_ACCESS_HOST_WRITE_BIT,
+			};
+
+			GraphicsPipelineBarrier barrier = {
+				.image_memory_barrier_count = 1,
+				.image_memory_barriers = &image_barrier,
+				.src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				.dst_stage = VK_PIPELINE_STAGE_HOST_BIT,
+			};
+			cmd_graphics_pipeline_barrier(cb, barrier);
+		}
+		end_graphics_command_buffer(cb);
+		submit_command_buffers(
+			render_queue,
+			0, 0,
+			0, 0,
+			1, &cb, 
+			0,
+			render_fences[frame_index]
+		);
+
+	}
 
 
 	u64 desired_frame_time = 1000000000/144;
@@ -305,11 +340,23 @@ s32 main(void)
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 
 		{
+			String8 str = str8_lit("0123456789-=+`~Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos. ");
+			u64 elapsed = get_epoch_ns();
+			for(u32 j = 50; j < 100; j++)
+			{
+				for(u32 i = 0; i < str.len; i++)
+				{
+					load_graphics_device_glyph(frame_arena, font_cache, berkeley_mono_font, str.data[i], j);
+				}
+			}
 			resolve_graphics_device_font_cache(font_cache);
+			elapsed = get_epoch_ns() - elapsed;
+			u64 cnt = 100 * str.len;
+			print("%u64 ns: %t\n", elapsed / cnt, elapsed);
 		}
 			
 		{
-			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[1]);
+			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 			vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 1, &frame_descriptor_pools[frame_index]->descriptor_sets[0].handle, 0,0);
 
 			{

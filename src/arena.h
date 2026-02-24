@@ -5,6 +5,7 @@ struct Thread;
 
 typedef struct{
 	u64 pos;		
+	u64 last;
 	u64 size;		
 }Arena;
 
@@ -38,6 +39,33 @@ typedef struct{
 
 #define allocate_array( ARENA , TYPE , COUNT ) (TYPE*)allocate_array_stride((ARENA), sizeof(TYPE), (COUNT))
 #define inherit_array( ARENA , TYPE ) (TYPE*)allocate_array_stride((ARENA), sizeof(TYPE), ((ARENA)->size - sizeof(Array)) / sizeof(TYPE))
+
+#define append_array( ARENA, TYPE, PTR_PTR, SRC)\
+({\
+	TYPE* PTR = *(PTR_PTR);\
+	if(USED(PTR) == TOTAL(PTR))\
+	{\
+		u64 used = USED(PTR);\
+		u64 new_total = TOTAL(PTR) * 2;\
+		TYPE *NEW_PTR = 0;\
+		if((u8*)(ARENA) + (ARENA)->last == (u8*)(PTR) - sizeof(Array))\
+		{\
+			arena_set(ARENA, (ARENA)->last);\
+			NEW_PTR = allocate_array(ARENA, TYPE, new_total);\
+			USED(NEW_PTR) = used;\
+		}\
+		else\
+		{\
+			NEW_PTR = allocate_array(ARENA, TYPE, new_total);\
+			memcpy(NEW_PTR, PTR, USED(PTR) * sizeof(TYPE));\
+			USED(NEW_PTR) = used;\
+		}\
+		(PTR_PTR)[0] = NEW_PTR;\
+	}\
+	TYPE s = SRC;\
+	memcpy(*(PTR_PTR) + USED(*(PTR_PTR)), &s, sizeof(TYPE));\
+	USED(*(PTR_PTR))++;\
+})
 
 void *allocate_array_stride(Arena *arena, u64 stride, u64 count);
 

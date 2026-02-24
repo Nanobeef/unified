@@ -23,7 +23,7 @@ if [[ "$compiler" = "GCC" ]]; then
 elif [[ "$compiler" = "CLANG" ]]; then
 	clang src/main.c -march=native -O0 -gdwarf -Wpedantic $libraries
 else
-	tcc $libraries src/main.c -gdwarf -Wpedantic  
+	tcc -gdwarf $libraries src/main.c -Wpedantic  
 fi
 
 TIME=$(($(get_time_us)-TIME))

@@ -28,6 +28,7 @@ void free_arena(Arena *arena)
 void* arena_push(Arena *arena, b32 zero, u64 size)
 {
 	void *data = (void*)((u64)arena + arena->pos);
+	arena->last = arena->pos;
 	arena->pos += size;
 	if(zero)
 	{
@@ -39,12 +40,14 @@ void* arena_push_aligned(Arena *arena, u64 size, u64 alignment)
 {
 	arena->pos = ForwardAlign(arena->pos, alignment);
 	void *data = (void*)((u64)arena + arena->pos);
+	arena->last = arena->pos;
 	arena->pos += size;
 	return data;
 }
 void arena_set(Arena *arena, u64 pos)
 {
 	arena->pos = Max(sizeof(Arena), pos);
+	arena->last = arena->pos;
 }
 void arena_pop(Arena *arena, u64 size)
 {
