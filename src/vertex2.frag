@@ -10,10 +10,10 @@ layout(set = 0, binding = 0) uniform sampler2D glyph_cache;
 
 void main()
 {
-	if(in_texture.x != 0.0)
+	if(in_texture.x > 0.0)
 	{
 		float c = textureLod(glyph_cache, in_texture, 0).r;
-		out_color = vec4(c) * in_color;
+		out_color = in_color * c;
 	}
 	else
 	{

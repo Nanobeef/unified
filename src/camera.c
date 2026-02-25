@@ -3,7 +3,7 @@
 
 Camera init_camera(void)
 {
-	f32 zoom = 0.5f;
+	f32 zoom = 1.0f;
 	f32x2 pan = f32x2_set(0.0, 0.0);
 	Camera camera = {
 		.aspect = 1.0f,
@@ -150,4 +150,20 @@ void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force
 		f32m3_affine_scale(camera->current_zoom * camera->aspect, camera->current_zoom),
 		f32m3_affine_translate(camera->current_pan.x, camera->current_pan.y)
 	);
+}
+
+FixedCamera create_fixed_camera(u32x2 pixel_size)
+{
+	FixedCamera camera = {0};
+	f32 aspect = (f32)pixel_size.y / (f32)pixel_size.x;
+	camera.pixel_size = pixel_size;
+	camera.unit_pixel = f32x2_div(f32x2_set(2.0 / aspect, 2.0), f32x2_cast_u32x2(pixel_size));
+	camera.top_left = f32x2_set(-1.0 / aspect, -1.0);
+	camera.top_right = f32x2_set(1.0 / aspect, -1.0);
+	camera.bottom_right = f32x2_set(1.0 / aspect, 1.0);
+	camera.bottom_left = f32x2_set(-1.0 / aspect, 1.0);
+	camera.center = f32x2_set(0.0, 0.0);
+	camera.affine = f32m3_affine_scale(aspect, 1.0);
+
+	return camera;
 }

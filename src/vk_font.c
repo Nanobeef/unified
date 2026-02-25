@@ -3,7 +3,7 @@
 
 #define BERKELEY_PATH "bin/BerkeleyMono-Regular.ttf"
 
-GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, GraphicsDevice *device)
+GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, GraphicsDevice *device, f32x2 dpi)
 {
 	FT_Error fterror = {0};
 	FT_Library ft_library;
@@ -13,11 +13,11 @@ GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, Graphic
 	}
 
 	GraphicsDeviceImage linear_image = create_graphics_device_image_explicit(
-		device->host_and_device_heap, u32x2_set(2048, 4096),
+		device->host_and_device_heap, u32x2_set(4096, 4096),
 		VK_FORMAT_R8_UNORM,  VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_TILING_LINEAR, VK_SAMPLE_COUNT_1_BIT
 	);
-	memset(linear_image.memory.mapping, 255, linear_image.memory.size);
+	memset(linear_image.memory.mapping, 0, linear_image.memory.size);
 
 	arena_push_type(arena, 0, 1, GraphicsDeviceFontCache, cache);
 	*cache = (GraphicsDeviceFontCache){
@@ -40,7 +40,7 @@ GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, Graphic
 	cache->max_row_height = 0;
 
 	Scratch scratch = find_scratch(0,1, &arena);
-	cache->default_font = create_graphics_device_font(arena, read_file(scratch.arena, str8_lit(BERKELEY_PATH)), cache);
+	cache->default_font = create_graphics_device_font(arena, read_file(scratch.arena, str8_lit(BERKELEY_PATH)), cache, dpi);
 	regress_scratch(scratch);
 
 	return cache;
@@ -54,7 +54,7 @@ void destroy_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 	FT_Done_FreeType(cache->ft_library);
 }
 
-GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_array, GraphicsDeviceFontCache *cache)
+GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_array, GraphicsDeviceFontCache *cache, f32x2 dpi)
 {
 	FT_Face face = {0};
 	FT_Error fterror = {0};
@@ -72,16 +72,7 @@ GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_arr
 	GraphicsDeviceFont font = {
 		.cache = cache,
 		.face = face,
-		.units_per_em = face->units_per_EM,
-		.ascender = face->ascender / 64,
-		.descender = face->descender / 64,
-		.height = face->height / 64,
-		.max_advance_width = face->max_advance_width / 64,
-		.bbox_xmin = face->bbox.xMin / 64,
-		.bbox_xmax= face->bbox.xMax / 64,
-		.bbox_ymin = face->bbox.yMin / 64,
-		.bbox_ymax= face->bbox.yMax / 64,
-		.underline_position = face->underline_position / 64,
+		.dpi = dpi,
 	};
 
 	GraphicsDeviceFont *dst = 0;
@@ -98,6 +89,30 @@ GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_arr
 	}
 SLOT_FOUND:
 	return dst;
+}
+
+GraphicsDeviceFont *graphics_device_font_compute_metrics(GraphicsDeviceFont *font, u32 pt)
+{
+	if(font->pt != pt)
+	{
+		font->pt = pt;
+		if(FT_Set_Char_Size(font->face, 0, font->pt * 64, font->dpi.x, font->dpi.y))
+		{
+			print("Failed to compute font metrics\n");
+		}
+		font->unit_em = f32x2_set(font->face->size->metrics.x_ppem, font->face->size->metrics.y_ppem);
+		font->ascender = font->face->size->metrics.ascender / 64;
+		font->descender = font->face->size->metrics.descender / 64;
+		font->line_height = (font->ascender - font->descender) / 64;
+		font->line_gap = font->face->height / 64;
+		font->max_advance_width = font->face->max_advance_width / 64;
+		font->bbox_xmin = font->face->bbox.xMin / 64;
+		font->bbox_xmax= font->face->bbox.xMax / 64;
+		font->bbox_ymin = font->face->bbox.yMin / 64;
+		font->bbox_ymax= font->face->bbox.yMax / 64;
+		font->underline_position = font->face->underline_position / 64;
+	}
+	return font;
 }
 
 void destroy_graphics_device_font(GraphicsDeviceFont *font)
@@ -124,6 +139,9 @@ u64 font_hash(u32 code, f32 pt)
 
 GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFontCache *cache, GraphicsDeviceFont *font, u32 code, f32 pt)
 {
+	if(font == 0)
+		font = cache->default_font;
+
 	u64 hash = font_hash(code, pt) % cache->glyph_capacity;
 	b32 duplicate = false;
 	GraphicsDeviceGlyph *slot = 0;
@@ -144,7 +162,7 @@ GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFont
 				}
 				else if(cache->glyph_map[i].filled == true)
 				{
-					if((cache->glyph_map[i].pt == pt) && (cache->glyph_map[i].code == code))
+					if((cache->glyph_map[i].pt == pt) && (cache->glyph_map[i].code == code) && (cache->glyph_map[i].font == font))
 					{
 						duplicate = true;
 						slot = cache->glyph_map + i;
@@ -160,14 +178,8 @@ GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFont
 	if(duplicate == false)
 	{
 		FT_Error fterror = {0};
-		if(font->pt != pt)
-		{
-			font->pt = pt;
-			if(fterror = FT_Set_Char_Size(font->face, 0, font->pt * 64, font->dpi.x, font->dpi.y))
-			{
-				print("Failed to set char size\n");	
-			}
-		}
+
+		graphics_device_font_compute_metrics(font, pt);
 		if((fterror = FT_Load_Char(font->face, code, FT_LOAD_COMPUTE_METRICS)))
 		{
 			print("Failed to load metrics\n");
@@ -183,26 +195,33 @@ GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFont
 		};
 		slot->font = font;
 		u32x2 bitmap_size = u32x2_set(font->face->glyph->bitmap.width, font->face->glyph->bitmap.rows);
-		slot->cache_size = bitmap_size;
-		if(cache->size.x < cache->position.x + slot->cache_size.x)
+		if((bitmap_size.x < cache->size.x) && (bitmap_size.y < cache->size.y))
 		{
-			cache->position.x = 0;
-			cache->position.y += cache->max_row_height;
-			cache->max_row_height = 0;
-		}
-		else
-		slot->cache_position = cache->position;
-		cache->position.x += bitmap_size.x;
-		cache->max_row_height = Max(slot->cache_size.y, cache->max_row_height);
+			slot->cache_size = bitmap_size;
+			if(cache->size.x < cache->position.x + slot->cache_size.x)
+			{
+				cache->position.x = 0;
+				cache->position.y += cache->max_row_height;
+				cache->max_row_height = 0;
+			}
+			slot->cache_position = cache->position;
+			cache->position.x += bitmap_size.x;
+			cache->max_row_height = Max(slot->cache_size.y, cache->max_row_height);
+			if(slot->cache_position.y + slot->cache_size.y > cache->size.y)
+			{
+				slot->in_cache = false;
+			}
+			else
+			{
+				slot->in_cache = true;
+			}
 
-		if(cache->new_glyph_array == 0)
-		{
-			cache->new_glyph_array = allocate_array(arena, GraphicsDeviceGlyph*, 16);
-		}
+			if(cache->new_glyph_array == 0)
+				cache->new_glyph_array = allocate_array(arena, GraphicsDeviceGlyph*, 16);
 
-		append_array(arena, GraphicsDeviceGlyph*, &cache->new_glyph_array, slot);
+			append_array(arena, GraphicsDeviceGlyph*, &cache->new_glyph_array, slot);
+		}
 	}
-
 	return slot;
 }
 
@@ -210,7 +229,6 @@ void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 {
 	RomuQuad rq = romu_quad_seed(get_epoch_ms());
 	u32x2 size = cache->linear_image.size;
-	size = u32x2_set1(256);
 
 	if(cache->new_glyph_array)
 	{
@@ -226,14 +244,7 @@ void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 				continue;
 			}
 			FT_Error fterror = {0};
-			if(font->pt != glyph->pt)
-			{
-				font->pt = glyph->pt;
-				if(fterror = FT_Set_Char_Size(font->face, 0, font->pt * 64, font->dpi.x, font->dpi.y))
-				{
-					print("Failed to set char size\n");	
-				}
-			}
+			graphics_device_font_compute_metrics(font, glyph->pt);
 			if((fterror = FT_Load_Char(font->face, glyph->code, FT_LOAD_RENDER)))
 			{
 				print("Failed to render bitmap\n");
@@ -242,6 +253,10 @@ void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 			u8* src = gs->bitmap.buffer;
 			u8* dst = cache->linear_image.memory.mapping;
 			u32x2 dst_size = cache->linear_image.size;
+			if(glyph->cache_position.y + glyph->cache_size.y > dst_size.y)
+			{
+				continue;
+			}
 			for(u32 y = 0; y < gs->bitmap.rows; y++)
 			{
 				for(u32 x = 0; x < gs->bitmap.width; x++)
@@ -252,27 +267,19 @@ void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 				}
 				src += gs->bitmap.pitch;
 			}
-
-
-
 		}
 	}
+	cache->new_glyph_array = 0;
 
-	if(0)
-	{
-		u8 *data = cache->linear_image.memory.mapping;
-		for(u32 y = 0; y < size.y; y++)
-		{
-			for(u32 x = 0; x < size.x; x++)
-			{
-				data[y * cache->linear_image.size.x + x] = (u8)romu_quad(&rq);
-			}
-		}
-	}
 	flush_graphics_device_memory(cache->linear_image.memory);
+}
+
+void invalidate_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
+{
+	memset(cache->glyph_map, 0, sizeof(GraphicsDeviceGlyph) * cache->glyph_capacity);
+	cache->glyph_count = 0;
 	cache->position = u32x2_set(0,0);
 	cache->max_row_height = 0;
-	cache->new_glyph_array = 0;
 }
 
 

@@ -6,18 +6,18 @@ typedef struct{
 	struct GraphicsDeviceFontCache *cache;
 	FT_Face face;
 	u32 index;
-
-	f32 units_per_em;
+	f32x2 unit_em;
 	f32 ascender;
 	f32 descender;
-	f32 height;
+	f32 line_gap;
+	f32 line_height;
 	f32 max_advance_width;
 	f32 bbox_xmin, bbox_xmax;
 	f32 bbox_ymin, bbox_ymax;
 	f32 underline_position;
-	f32x2 dpi;
+
 	f32 pt;
-		
+	f32x2 dpi;
 }GraphicsDeviceFont;
 
 
@@ -27,11 +27,13 @@ typedef struct{
 	f32x2 size;
 	f32x2 bearing;
 	f32 advance;
+
 }Glyph;
 
 typedef struct{
 	b32 filled;
 	b32 removed;
+	b32 in_cache;
 	u32 code;
 	f32 pt;
 	Glyph glyph;
@@ -66,8 +68,9 @@ typedef struct GraphicsDeviceFontCache{
 }GraphicsDeviceFontCache;
 
 
-GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, GraphicsDevice *device);
+GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, GraphicsDevice *device, f32x2 dpi);
 void destroy_graphics_device_font_cache(GraphicsDeviceFontCache *cache);
-GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_array, GraphicsDeviceFontCache *cache);
-GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFontCache *cache, GraphicsDeviceFont *font, u32 code, f32 pt);
+GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_array, GraphicsDeviceFontCache *cache, f32x2 dpi);
+GraphicsDeviceFont *graphics_device_font_compute_metrics(GraphicsDeviceFont *font, u32 pt);
 void destroy_graphics_device_font(GraphicsDeviceFont *font);
+GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFontCache *cache, GraphicsDeviceFont *font, u32 code, f32 pt);

@@ -13,12 +13,22 @@ typedef struct{
 	u64 size;
 
 	GraphicsDeviceFontCache *font_cache;
+	Arena *frame_arena;
 }GraphicsDeviceVertexBuffer;
 
 GraphicsDeviceVertexBuffer create_graphics_device_vertex_buffer(GraphicsDeviceMemoryHeap* heap, u64 size, u64 vertex_stride, GraphicsDeviceFontCache *font_cache);
 void destroy_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer vb);
+
 void graphics_device_vertex_buffer_push(GraphicsDeviceVertexBuffer *vb, u32 count, const Vertex2 *vertices);
 void graphics_device_vertex_buffer_push_indexed(GraphicsDeviceVertexBuffer *vb, u32 index_count, u32 *indices, u32 vertex_count, const Vertex2 *vertices);
+
 void reset_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
 void flush_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
+
+
+GraphicsDeviceVertexBuffer *begin_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb, GraphicsDeviceFontCache *font_cache, Arena *frame_arena);
+void end_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
+
+
 void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb);
+

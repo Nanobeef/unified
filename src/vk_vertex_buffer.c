@@ -48,7 +48,7 @@ void graphics_device_vertex_buffer_push_indexed(GraphicsDeviceVertexBuffer *vb, 
 	for(u32 i = 0; i < index_count; i++)
 	{
 		u32 index = vb->vertex_total - vb->vertex_count - indices[i];
-		index_position[i] = index;
+		index_position[i] = index-1;
 	}
 	vb->vertex_count += vertex_count;
 	vb->index_count += index_count;
@@ -60,14 +60,28 @@ void reset_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb)
 	vb->vertex_count = 0;
 }
 
+GraphicsDeviceVertexBuffer *begin_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb, GraphicsDeviceFontCache *font_cache, Arena *frame_arena)
+{
+	vb->frame_arena = frame_arena;
+	vb->font_cache = font_cache;
+	reset_graphics_device_vertex_buffer(vb);
+	return vb;
+}
+void end_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb)
+{
+	vb->frame_arena = 0;
+	vb->font_cache = 0;
+	flush_graphics_device_memory(vb->buffer.memory);
+}
+
 void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb)
 {
-	if(vb.vertex_count)
+	if(vb.index_count)
 	{
-		u64 offset = (vb.vertex_total - vb.vertex_count) * vb.vertex_stride;
-		vkCmdBindIndexBuffer(cb.handle, vb.buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+		u64 offset = 0;
 		vkCmdBindVertexBuffers(cb.handle, 0,1, &vb.buffer.handle, &offset);
-		vkCmdDraw(cb.handle, vb.vertex_count, 1, 0, 0);
+		vkCmdBindIndexBuffer(cb.handle, vb.buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(cb.handle, vb.index_count, 1, 0, 0, 0);
 	}
 }
 

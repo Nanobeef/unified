@@ -71,6 +71,10 @@ typedef u64 EpochTimeMS;
 typedef u64 EpochTimeS;
 typedef u64 EpochTime;
 
+typedef u64 TimeNS;
+typedef u64 TimeUS;
+typedef u64 TimeMS;
+typedef u64 TimeS;
 typedef u64 Time;
 
 typedef enum{
@@ -94,11 +98,15 @@ typedef enum{
 	PRINT_KEYWORD_Cstring,
 
 	PRINT_KEYWORD_Time,
+	PRINT_KEYWORD_TimeNS,
+	PRINT_KEYWORD_TimeUS,
+	PRINT_KEYWORD_TimeS,
+	PRINT_KEYWORD_TimeMS,
 
 	PRINT_KEYWORD_EpochTime,
+	PRINT_KEYWORD_EpochTimeMS,
 	PRINT_KEYWORD_EpochTimeNS,
 	PRINT_KEYWORD_EpochTimeUS,
-	PRINT_KEYWORD_EpochTimeMS,
 	PRINT_KEYWORD_EpochTimeS,
 
 	PRINT_KEYWORD_void_pointer,
@@ -133,12 +141,18 @@ PrintKeyword keywords[] = {
 	p1(f32x2),
 	p2(s, String8),
 	p2(cs, Cstring),
+
 	p2(et, EpochTime),
 	p2(ets, EpochTimeS),
 	p2(etms, EpochTimeMS),
 	p2(etus, EpochTimeUS),
 	p2(etns, EpochTimeNS),
+
 	p2(t, Time),
+	p2(ts, TimeS),
+	p2(tms, TimeMS),
+	p2(tus, TimeUS),
+	p2(tns, TimeNS),
 };
 #undef pk
 
@@ -228,6 +242,22 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		len = snprintf((char*)dst, size, "%lu ms", d);
 	}break;
 	case PRINT_KEYWORD_EpochTimeS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu s", d);
+	}break;
+	case PRINT_KEYWORD_TimeNS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu ns", d);
+	}break;
+	case PRINT_KEYWORD_TimeUS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu us", d);
+	}break;
+	case PRINT_KEYWORD_TimeMS:{
+		u64 d = *(u64*)data;
+		len = snprintf((char*)dst, size, "%lu ms", d);
+	}break;
+	case PRINT_KEYWORD_TimeS:{
 		u64 d = *(u64*)data;
 		len = snprintf((char*)dst, size, "%lu s", d);
 	}break;
@@ -345,6 +375,22 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 	case PRINT_KEYWORD_EpochTime:{
 		u64 t = get_epoch_ms();
 		len = keyword_to_buffer(size, dst, PRINT_KEYWORD_EpochTimeMS, &t);
+	}break;
+	case PRINT_KEYWORD_TimeNS:{
+		u64 d = va_arg(l, u64);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_TimeUS:{
+		u64 d = va_arg(l, u64) / 1000;
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_TimeMS:{
+		u64 d = va_arg(l, u64) / 1000000;
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_TimeS:{
+		u64 d = va_arg(l, u64) / 1000000000;
+		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
 	case PRINT_KEYWORD_Time:{
 		u64 d = va_arg(l, u64);
