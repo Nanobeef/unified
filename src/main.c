@@ -317,7 +317,7 @@ s32 main(void)
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
 			Scratch scratch = find_scratch(0,0,0);
 			String8 str = str8_print(scratch.arena, "Time:\t\t%ets\nElapsed Time:\t%tus\nSleep Time:\t%tus\nFrame Time:\t%tus\nTarget Time:\t%tus", elapsed_time, sleep_time, frame_time, desired_frame_time);
-			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20);
+			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20, f32x4_color_teal);
 			regress_scratch(scratch);
 			end_graphics_device_vertex_buffer(vb);
 		}

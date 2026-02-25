@@ -20,7 +20,7 @@ String8 str8_vprint(Arena *arena, const char *format, va_list l)
 	u64 size = arena->size - arena->pos;
 	u8* data = (u8*)arena + arena->pos;
 	u64 len = vmemprint(arena, size, data, format, l);
-	arena_push(arena, 0, size);
+	arena_push(arena, 0, len);
 	return (String8){
 		.len = len,
 		.data = data,
@@ -49,6 +49,7 @@ u64 vprint(Arena *arena, const char *format, va_list l)
 		printf("\033[38;5;%dm", color - 1);
 	}
 	fwrite((const void*)str.data, 1, str.len, stdout);
+	fflush(stdout);
 	if(color)
 	{
 		printf("\033[0m");

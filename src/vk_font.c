@@ -105,7 +105,7 @@ GraphicsDeviceFont *graphics_device_font_compute_metrics(GraphicsDeviceFont *fon
 		font->descender = font->face->size->metrics.descender / 64;
 		font->line_height = (font->ascender - font->descender) / 64;
 		font->line_gap = font->face->height / 64;
-		font->max_advance_width = font->face->max_advance_width / 64;
+		font->max_advance_width = font->face->size->metrics.max_advance / 64;
 		font->bbox_xmin = font->face->bbox.xMin / 64;
 		font->bbox_xmax= font->face->bbox.xMax / 64;
 		font->bbox_ymin = font->face->bbox.yMin / 64;
