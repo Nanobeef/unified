@@ -317,7 +317,7 @@ s32 main(void)
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
 			Scratch scratch = find_scratch(0,0,0);
 			String8 str = str8_print(scratch.arena, "Time:\t\t%ets\nElapsed Time:\t%tus\nSleep Time:\t%tus\nFrame Time:\t%tus\nTarget Time:\t%tus", elapsed_time, sleep_time, frame_time, desired_frame_time);
-			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20, f32x4_color_teal);
+			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20, f32x4_color_white);
 			regress_scratch(scratch);
 			end_graphics_device_vertex_buffer(vb);
 		}
@@ -325,7 +325,7 @@ s32 main(void)
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
 			
-			RomuQuad rq = romu_quad_seed(10032221);
+			RomuQuad rq = romu_quad_seed(get_epoch_ms() / 250);
 			u64 triangle_count = 10000;
 			for(u32 i = 0; i < triangle_count * 3; i+=3)
 			{
@@ -341,10 +341,17 @@ s32 main(void)
 				f32m2 rotate = f32m2_rotate(t);
 				rotate = f32m2_mul(rotate, f32m2_scale(scale, scale));
 
+				/*
 				Vertex2 vertices[3] = {
 					{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
 					{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
 					{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+				};
+				*/
+				Vertex2 vertices[3] = {
+					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
 				};
 				graphics_device_vertex_buffer_push(vb, 3, vertices);
 			}

@@ -91,12 +91,15 @@ typedef enum{
 	PRINT_KEYWORD_f32,	
 	PRINT_KEYWORD_f64,	
 
+	PRINT_KEYWORD_f32x4,
+
 	PRINT_KEYWORD_u32x2,	
 	PRINT_KEYWORD_s32x2,	
 	PRINT_KEYWORD_f32x2,	
 
 	PRINT_KEYWORD_String8,
 	PRINT_KEYWORD_Cstring,
+
 
 	PRINT_KEYWORD_Time,
 	PRINT_KEYWORD_TimeNS,
@@ -137,6 +140,7 @@ PrintKeyword keywords[] = {
 	p1(s64),
 	p1(f32),
 	p1(f64),
+	p1(f32x4),
 	p1(u32x2),
 	p1(s32x2),
 	p1(f32x2),
@@ -215,6 +219,10 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 	case PRINT_KEYWORD_f32x2:{
 		f32x2 d = *(f32x2*)data;
 		len = snprintf((char*)dst, size, "(%f %f)", d.x, d.y);
+	}break;
+	case PRINT_KEYWORD_f32x4:{
+		f32x4 d = *(f32x4*)data;
+		len = snprintf((char*)dst, size, "(%f %f %f %f)", d.r, d.g, d.b, d.a);
 	}break;
 	case PRINT_KEYWORD_String8:{
 		String8 d = *(String8*)data;
@@ -349,6 +357,10 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 		f32x2 d = va_arg(l, f32x2);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
+	case PRINT_KEYWORD_f32x4:{
+		f32x4 d = va_arg(l, f32x4);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
 	case PRINT_KEYWORD_String8:{
 		String8 d = va_arg(l, String8);
 		len = keyword_to_buffer(size, dst, index, &d);
@@ -412,7 +424,7 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 
 
 
-PrintKeyword search_print_keywords(String8 s)
+PrintKeyword search_print_keywords1(String8 s)
 {
 	const u8* c = s.data+1;	
 	PrintKeyword match = {0};
@@ -439,6 +451,33 @@ PrintKeyword search_print_keywords(String8 s)
 		if(j > match.string.len)
 		{
 			shortest_match_len = j;
+			match = keywords[i];
+		}
+	}
+	return match;
+}
+
+PrintKeyword search_print_keywords(String8 s)
+{
+	const u8* c = s.data+1;	
+	PrintKeyword match = {0};
+	u64 longest_match = 0;
+	for(u32 i = 0; i < Arrlen(keywords); i++)
+	{
+		String8 s = keywords[i].string;
+		u32 j = 0;
+
+		for(j = 0; j < s.len; j++)
+		{
+			if(c[j] != s.data[j])
+				break;
+				
+		}
+		if(j == 0)
+			continue;
+		if(j > longest_match)
+		{
+			longest_match = j;
 			match = keywords[i];
 		}
 	}

@@ -74,3 +74,46 @@ f32x2 romu_quad_f32x2(RomuQuad *rq)
 	return f;
 }
 
+
+f32 romu_quad_positive_f32(RomuQuad *rq)
+{
+	u64 v = romu_quad(rq);
+	u32 u = 0x3F800000 | (v & (0x7FFFFF));
+	f32 f;
+	memcpy(&f,&u, 4);
+	f = f - 1.0f;
+	return f;
+}
+f64 romu_quad_positive_f64(RomuQuad *rq)
+{
+	u64 v = romu_quad(rq);
+	u64 u = 0x3FF0000000000000 | (v & (0xFFFFFFFFFFFFF));
+	f64 f;
+	memcpy(&f,&u, 8);
+	f = f - 1.0;
+	return f;
+}
+f32x2 romu_quad_positive_f32x2(RomuQuad *rq)
+{
+	u64 v = romu_quad(rq);
+	u64 u = 0x3F8000003F800000 | (v & (0x007FFFFF007FFFFF));
+	f32x2 f;
+	memcpy(&f,&u, 8);
+	f = f32x2_sub(f, f32x2_set1(1.0f));
+	return f;
+}
+
+f32x4 romu_quad_color(RomuQuad *rq)
+{
+	f32x4 ret;
+	f32x2 a[2] = {romu_quad_positive_f32x2(rq),romu_quad_positive_f32x2(rq)};
+	memcpy(&ret, a, 16);
+	return ret;
+}
+
+f32x4 romu_quad_solid_color(RomuQuad *rq)
+{
+	f32x4 c = romu_quad_color(rq);
+	c.a = 1.0;
+	return c;
+}

@@ -441,6 +441,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	VkGraphicsPipelineCreateInfo infos[2];
 	infos[0] = info;
 	infos[1] = info;
+	infos[1].pRasterizationState = &line_rasterization_state;
 	VkPipeline vertex2_pipelines[2];
 	VK_ASSERT(vkCreateGraphicsPipelines(device->handle, 0, 2, infos, vkb, vertex2_pipelines));
 	pipelines.vertex2 = vertex2_pipelines[0];
