@@ -10,8 +10,8 @@
 
 ## Plans
   - Refactor 2D draw function
-  - Refactor of GUI
-  - Refactor of Boids
+  - Refactor GUI
+  - Refactor Boids
   - GPU Boids
 
 ### February 25th 2026
