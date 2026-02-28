@@ -41,7 +41,7 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 		chosen_index = 0;
 		goto INDEX_CHOSEN;
 	}
-	if(type_request < physical_device_count)
+	if(type_request < INTEGRATED_GRAPHICS_DEVICE)
 	{
 		chosen_index = (u32)type_request;
 		goto INDEX_CHOSEN;
@@ -55,7 +55,7 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 			{
 				if(physical_devices[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
 				{
-					chosen_index = 0;
+					chosen_index = i;
 				}
 			}
 		}break;
@@ -64,7 +64,7 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 			{
 				if(physical_devices[i].properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 				{
-					chosen_index = 0;
+					chosen_index = i;
 				}
 			}
 		}break;

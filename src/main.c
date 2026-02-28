@@ -115,7 +115,7 @@ s32 main(void)
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
 
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, 1);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
 
@@ -252,7 +252,9 @@ s32 main(void)
 		if(elapsed_time < desired_frame_time)
 		{
 			sleep_time = desired_frame_time - elapsed_time;
-			usleep(sleep_time / 1000);
+
+			u64 us = sleep_time / 1000;
+			usleep(us);
 		}
 		frame_time = elapsed_time + sleep_time;
 		start_time = get_time_ns();
@@ -318,19 +320,23 @@ s32 main(void)
 			Scratch scratch = find_scratch(0,0,0);
 			String8 str = str8_print(scratch.arena, "Time:\t\t%ets\nElapsed Time:\t%tus\nSleep Time:\t%tus\nFrame Time:\t%tus\nTarget Time:\t%tus", elapsed_time, sleep_time, frame_time, desired_frame_time);
 			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20, f32x4_color_white);
-			regress_scratch(scratch);
 			end_graphics_device_vertex_buffer(vb);
 		}
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
 			
-			RomuQuad rq = romu_quad_seed(get_epoch_ms() / 250);
-			u64 triangle_count = 10000;
+			RomuQuad rq = romu_quad_seed(1231);
+			u64 triangle_count = 1000;
 			for(u32 i = 0; i < triangle_count * 3; i+=3)
 			{
-				f32x2 point = romu_quad_f32x2(&rq);
-				point = f32x2_mul1(point, 0.9f);
+				f32x2 point;
+				f32 radius = 0.9;
+				do{
+					point = romu_quad_f32x2(&rq);
+					point = f32x2_mul1(point, radius);
+				}while(f32x2_length(point) > radius);
+
 				f64 d = romu_quad_f64(&rq);
 				int ds = signbit(d);
 				d *= 2.0;
