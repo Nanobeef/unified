@@ -33,10 +33,10 @@ Window *create_window(Arena *arena)
 		);
 	}
 
-	if(0){
-
 	xcb_visualid_t visual = 0;
+	if(0)
 	{
+
 		xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);	
 		while(depth_iter.rem)
 		{
@@ -56,13 +56,66 @@ Window *create_window(Arena *arena)
 			}
 			xcb_depth_next(&depth_iter);
 		}
-	VISUAL_FOUND:
+		VISUAL_FOUND:
 	}
+
+	u64 refresh_rate = 0;
+	{
+		xcb_randr_get_screen_resources_current_cookie_t resource_cookie = 
+		xcb_randr_get_screen_resources_current(connection, screen->root);
+		xcb_randr_get_screen_resources_current_reply_t *reply = 
+		xcb_randr_get_screen_resources_current_reply(connection, resource_cookie, NULL);
+		if(!reply)
+		{
+			print("Failed to get screen resources (xcb-randr)\n");
+		}
+
+		xcb_randr_output_t *outputs = xcb_randr_get_screen_resources_current_outputs(reply);
+		s32 output_count = xcb_randr_get_screen_resources_current_outputs_length(reply);
+
+		for(s32 i = 0; i < (output_count) && (refresh_rate == 0); i++)
+		{
+			xcb_randr_get_output_info_cookie_t out_cookie = 
+			xcb_randr_get_output_info(connection, outputs[i], reply->config_timestamp);
+			xcb_randr_get_output_info_reply_t *out = 
+			xcb_randr_get_output_info_reply(connection, out_cookie, NULL);
+
+			if(out && out->connection == XCB_RANDR_CONNECTION_CONNECTED && out->crtc != XCB_NONE)
+			{
+				xcb_randr_get_crtc_info_cookie_t crtc_cookie = 
+				xcb_randr_get_crtc_info(connection, out->crtc, reply->config_timestamp);
+				xcb_randr_get_crtc_info_reply_t *crtc = 
+				xcb_randr_get_crtc_info_reply(connection, crtc_cookie, NULL);
+
+				if(crtc && crtc->mode != XCB_NONE)
+				{
+					xcb_randr_mode_t mode_id = crtc->mode;
+
+					xcb_randr_mode_info_iterator_t mode_iter = 
+					xcb_randr_get_screen_resources_current_modes_iterator(reply);
+
+					while(mode_iter.rem)
+					{
+						xcb_randr_mode_info_t *mode = mode_iter.data;
+						if(mode->id == mode_id)
+						{
+							f64 rr =  (f64)(mode->htotal * mode->vtotal) / (f64)mode->dot_clock;
+							refresh_rate = (u64)(rr * 1000000000.0);
+							goto INFO_FOUND;
+						}
+					}
+				}
+			}
+
+		}
+INFO_FOUND:
+	}
+
+
 
 
 	xcb_colormap_t colormap = xcb_generate_id(connection);
 	xcb_create_colormap(connection, XCB_COLORMAP_ALLOC_NONE, colormap, screen->root, visual);
-	}
 
 	xcb_window_t handle = xcb_generate_id(connection);
 
@@ -113,6 +166,7 @@ Window *create_window(Arena *arena)
 		.screen_size_in_mm = screen_size_in_mm,
 		.screen_size_in_pixels = screen_size_in_pixels,
 		.screen_dpi = screen_dpi,
+		.refresh_rate = refresh_rate,
 	};
 
 	return window;

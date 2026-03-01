@@ -204,7 +204,6 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		len = snprintf((char*)dst, size, "%f", (f64)d);
 	}break;
 	case PRINT_KEYWORD_f64:{
-		printf("f64\n");
 		f64 d = *(f64*)data;
 		len = snprintf((char*)dst, size, "%f", (f64)d);
 	}break;

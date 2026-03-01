@@ -15,7 +15,7 @@ fi
 
 
 
-libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lfreetype -I/usr/include/freetype2"
+libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lxcb-randr -lfreetype -I/usr/include/freetype2"
 
 TIME=$(get_time_us)
 if [[ "$compiler" = "GCC" ]]; then

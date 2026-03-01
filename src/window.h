@@ -12,6 +12,7 @@ typedef struct{
 	u32x2 screen_size_in_mm;
 	u32x2 screen_size_in_pixels;
 	f32x2 screen_dpi;
+	u64 refresh_rate;
 
 
 }Window;

@@ -19,6 +19,7 @@
 
 #include <xcb/xcb_keysyms.h>
 #include <xcb/xproto.h>
+#include <xcb/randr.h>
 #include <X11/keysym.h>
 
 #include <ft2build.h>
@@ -238,7 +239,8 @@ s32 main(void)
 	}
 
 
-	u64 desired_frame_time = 1000000000/144;
+	u64 desired_frame_time = window->refresh_rate;
+	print("%f64\n", 1000000000.0 / (f64)desired_frame_time);
 	u64 start_time = get_time_ns();;
 	u64 end_time = 0;
 	u64 elapsed_time = 0;
