@@ -103,12 +103,15 @@ Window *create_window(Arena *arena)
 							refresh_rate = (u64)(rr * 1000000000.0);
 							goto INFO_FOUND;
 						}
+						xcb_randr_mode_info_next(&mode_iter);
 					}
 				}
+				free(crtc);
 			}
-
+			free(out);
 		}
 INFO_FOUND:
+	free(reply);
 	}
 
 

@@ -68,12 +68,21 @@ static u64 next_power_of_two(u64 x)
 
 #define Align( x ) (__attribute__((aligned(x))))
 
+
 #if defined(__TINYC__)
 	#define COMPILER_TCC 1
+	#define DEBUG
 #elif defined (__GNUC__)
 	#define COMPILER_GCC 1
+	#if defined(_DEBUG)
+		#define DEBUG
+	#endif
 #elif defined (__clang__)
 	#define COMPILER_CLANG 1
+	#define COMPILER_GCC 1
+	#if defined(_DEBUG)
+		#define DEBUG
+	#endif
 #else
 	#error Compiler unknown
 #endif
@@ -114,7 +123,6 @@ static u64 next_power_of_two(u64 x)
 	#include <sys/wait.h>
 	#include <pthread.h>
 #endif
-
 
 
 // Sometimes a function pointer will be cast to and from an atomic u64

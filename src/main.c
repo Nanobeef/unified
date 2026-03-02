@@ -8,11 +8,13 @@
 #include "thread.h"
 #include "file.h"
 #include "event.h"
+#include "info.h"
 
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sched.h>
 
 #define VK_USE_PLATFORM_XCB_KHR
 #include <vulkan/vulkan.h>
@@ -24,6 +26,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 
 #include "window.h"
 #include "vk_instance.h"
@@ -70,6 +73,7 @@ Arena *main_arena;
 Thread *main_thread;
 Mutex thread_table_mutex;
 u32 max_thread_count = 1024;
+u64 physical_thread_count = 1;
 Thread **thread_table;
 u64 epoch_time_ns;
 
@@ -95,7 +99,13 @@ void init(void)
 #endif
 
 	thread_table = arena_push(main_arena, true, max_thread_count * sizeof(Thread*));
-	thread_table_mutex = create_mutex();
+	if(1)
+	{
+		struct sched_param param = {.sched_priority = sched_get_priority_max(SCHED_FIFO)};
+		pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+	}
+	physical_thread_count = get_physical_thread_count();
+	b32 t = set_thread_affinity(main_thread, physical_thread_count - 1);
 }
 
 void cleanup(void)
@@ -105,19 +115,21 @@ void cleanup(void)
 	exit(0);
 }
 
-
-
-
 s32 main(void)
 {
 	init();
-
+	tidings.startup_time = mark_time();
 	Window *window = create_window(main_arena);
+	tidings.window_create_time = record_time();
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
+	tidings.vk_instance_create_time = record_time();
 	GraphicsSurface surface = create_graphics_surface(window, instance);
-
+	tidings.vk_surface_create_time = record_time();
 	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
+	tidings.vk_device_create_time = record_time();
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
+	tidings.vk_swapchain_create_time = record_time();
+
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
 
 	u32 frame_count = 2;
@@ -237,29 +249,29 @@ s32 main(void)
 		);
 
 	}
+	
+
+	end_time(&tidings.startup_time);
 
 
-	u64 desired_frame_time = window->refresh_rate;
-	print("%f64\n", 1000000000.0 / (f64)desired_frame_time);
-	u64 start_time = get_time_ns();;
-	u64 end_time = 0;
-	u64 elapsed_time = 0;
-	u64 sleep_time = 0;
-	u64 frame_time = 0;
+	tidings.desired_frame_time = window->refresh_rate;
+	u64 frame_start_time = get_epoch_ns();;
+	u64 frame_end_time = 0;
 	while(true)
 	{
-		end_time = get_time_ns();
-		elapsed_time = end_time - start_time;
-		sleep_time = 0;
-		if(elapsed_time < desired_frame_time)
+		frame_end_time = get_epoch_ns();
+		tidings.frame_elapsed_time = frame_end_time - frame_start_time;
+		tidings.frame_sleep_time = mark_time();
+		u64 frame_sleep_time = 0;
+		if(tidings.frame_elapsed_time < tidings.desired_frame_time  && (swapchain.create_info.presentMode == VK_PRESENT_MODE_FIFO_KHR))
 		{
-			sleep_time = desired_frame_time - elapsed_time;
+			frame_sleep_time = tidings.desired_frame_time - tidings.frame_elapsed_time;
 
-			u64 us = sleep_time / 1000;
+			u64 us = frame_sleep_time / 1000;
 			usleep(us);
 		}
-		frame_time = elapsed_time + sleep_time;
-		start_time = get_time_ns();
+		frame_start_time = end_time(&tidings.frame_sleep_time);
+		tidings.frame_time = tidings.frame_elapsed_time + tidings.frame_sleep_time;
 		
 		frame_index = frame_accum % frame_count;
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
@@ -269,7 +281,6 @@ s32 main(void)
 		PolledEvents pe = poll_events(frame_arena, event_ring_buffer);
 		if(pe.escape.pressed)
 			break;
-
 		update_camera(&camera, pe, window->size, false);
 		fixed_camera = create_fixed_camera(window->size);
 
@@ -281,6 +292,7 @@ s32 main(void)
 			VkResult result = vkAcquireNextImageKHR(device->handle, swapchain.handle, U64_MAX, swapchain_semaphores[frame_index].handle, 0, &swapchain.image_index);
 			if(pe.window_should_resize || (result != VK_SUCCESS))
 			{
+				mark_time();
 				resize_accum++;
 				resize_index = resize_accum % resize_count;
 				resize_arena = resize_arenas[resize_index];
@@ -310,6 +322,7 @@ s32 main(void)
 
 				destroy_graphics_semaphore(swapchain_semaphores[frame_index]);
 				swapchain_semaphores[frame_index] = create_graphics_semaphore(device);
+				tidings.resize_time = record_time();
 				continue;
 			}
 			image_index = swapchain.image_index;
@@ -317,19 +330,26 @@ s32 main(void)
 			target_image = target_images[image_index];
 
 		}
+		tidings.poll_time = record_time();
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
+			String8 str;
 			Scratch scratch = find_scratch(0,0,0);
-			String8 str = str8_print(scratch.arena, "Time:\t\t%ets\nElapsed Time:\t%tus\nSleep Time:\t%tus\nFrame Time:\t%tus\nTarget Time:\t%tus", elapsed_time, sleep_time, frame_time, desired_frame_time);
-			draw_str8_wrap(vb, fixed_camera, f32x2_set(10,0), window->size.x, str, 20, f32x4_color_white);
+			str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
+			"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
+			tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
+			tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
+			tidings.cb_wait_time, tidings.cb_record_time);
+			draw_str8_wrap(vb, fixed_camera, f32x2_set(1,0), window->size.x, str, 16, f32x4_color_white);
+			regress_scratch(scratch);
 			end_graphics_device_vertex_buffer(vb);
 		}
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
 			
-			RomuQuad rq = romu_quad_seed(1231);
-			u64 triangle_count = 1000;
+			RomuQuad rq = romu_quad_seed(epoch_time_ns);
+			u64 triangle_count = 10000;
 			for(u32 i = 0; i < triangle_count * 3; i+=3)
 			{
 				f32x2 point;
@@ -349,27 +369,33 @@ s32 main(void)
 				f32m2 rotate = f32m2_rotate(t);
 				rotate = f32m2_mul(rotate, f32m2_scale(scale, scale));
 
-				/*
-				Vertex2 vertices[3] = {
-					{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-					{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-					{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-				};
-				*/
-				Vertex2 vertices[3] = {
-					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-					{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
-				};
-				graphics_device_vertex_buffer_push(vb, 3, vertices);
+				if(0)
+				{
+					Vertex2 vertices[3] = {
+						{.color = {{{1.0, 0.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+						{.color = {{{0.0, 1.0, 0.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+						{.color = {{{0.0, 0.0, 1.0, 1.0}}}, .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					};
+					graphics_device_vertex_buffer_push(vb, 3, vertices);
+				}
+				else
+				{
+					Vertex2 vertices[3] = {
+						{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+						{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+						{.color = romu_quad_color(&rq), .position = f32x2_add(point, f32x2_mul_f32m2(romu_quad_f32x2(&rq), rotate))},
+					};
+					graphics_device_vertex_buffer_push(vb, 3, vertices);
+				}
 			}
 			end_graphics_device_vertex_buffer(vb);
 		}
-
+		tidings.draw_time = record_time();
+		resolve_graphics_device_font_cache(font_cache);
+		tidings.font_resolve_time = record_time();
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
+		tidings.cb_wait_time = record_time();
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
-
-			
 		{
 			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 			vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 1, &frame_descriptor_pools[frame_index]->descriptor_sets[0].handle, 0,0);
@@ -465,10 +491,8 @@ s32 main(void)
 			}
 
 			end_graphics_command_buffer(cb);
+			tidings.cb_record_time = record_time();
 
-			{
-				resolve_graphics_device_font_cache(font_cache);
-			}
 		
 			submit_command_buffers(
 				render_queue,
@@ -484,6 +508,7 @@ s32 main(void)
 
 		frame_accum++;
 	}
+	mark_time();
 	vkDeviceWaitIdle(device->handle);
 
 
@@ -514,6 +539,7 @@ s32 main(void)
 	destroy_graphics_surface(surface);
 	destroy_graphics_instance(instance);
 	destroy_window(window);
+	tidings.cleanup_time = record_time();
 
 	cleanup();
 }

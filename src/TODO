@@ -1,0 +1,20 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Low Priority:
+	Can currently set main thread to be the highest indexed physical thread. Still need to check for Intel differing core types and set for highest "P" thread index.

@@ -91,6 +91,9 @@ typedef enum{
 	PRINT_KEYWORD_f32,	
 	PRINT_KEYWORD_f64,	
 
+	PRINT_KEYWORD_b8,	
+	PRINT_KEYWORD_b32,	
+
 	PRINT_KEYWORD_f32x4,
 
 	PRINT_KEYWORD_u32x2,	
@@ -140,6 +143,8 @@ PrintKeyword keywords[] = {
 	p1(s64),
 	p1(f32),
 	p1(f64),
+	p1(b8),
+	p1(b32),
 	p1(f32x4),
 	p1(u32x2),
 	p1(s32x2),
@@ -199,13 +204,20 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		len = snprintf((char*)dst, size, "%ld", (s64)d);
 	}break;
 	case PRINT_KEYWORD_f32:{
-
 		f32 d = *(f32*)data;
 		len = snprintf((char*)dst, size, "%f", (f64)d);
 	}break;
 	case PRINT_KEYWORD_f64:{
 		f64 d = *(f64*)data;
 		len = snprintf((char*)dst, size, "%f", (f64)d);
+	}break;
+	case PRINT_KEYWORD_b8:{
+		b8 d = *(b8*)data;
+		len = snprintf((char*)dst, size, "%d", (s32)d);
+	}break;
+	case PRINT_KEYWORD_b32:{
+		b32 d = *(b32*)data;
+		len = snprintf((char*)dst, size, "%d", (s32)d);
 	}break;
 	case PRINT_KEYWORD_u32x2:{
 		u32x2 d = *(u32x2*)data;
@@ -342,6 +354,14 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 	}break;
 	case PRINT_KEYWORD_f64:{
 		f64 d = va_arg(l, f64);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_b8:{
+		b8 d = (b8)va_arg(l, b32);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_b32:{
+		b32 d = va_arg(l, b32);
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
 	case PRINT_KEYWORD_u32x2:{

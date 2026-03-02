@@ -243,3 +243,25 @@ Thread* current_thread(void)
 	return 0;
 }
 #endif
+
+u32 get_physical_thread_count()
+{
+	cpu_set_t mask;
+	sched_getaffinity(0,sizeof(mask), &mask);
+	s32 count = CPU_COUNT(&mask);
+	return Min((u32)count, 1024);
+}
+
+b32 set_thread_affinity(Thread *thread, u32 cpu_index)
+{
+	if(thread == 0)
+		thread = current_thread();
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	CPU_SET((u64)cpu_index, &set);
+	if(pthread_setaffinity_np(thread->handle, sizeof(cpu_set_t), &set))
+	{
+		return false;
+	}
+	return true;
+}

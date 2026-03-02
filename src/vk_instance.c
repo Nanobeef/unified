@@ -69,7 +69,9 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 //			.pNext = &validation_features,
 			.pApplicationInfo = &appinfo,
+#ifdef DEBUG
 			.enabledLayerCount = Arrlen(layers),
+#endif
 			.ppEnabledLayerNames = layers,
 			.enabledExtensionCount = Arrlen(extensions),
 			.ppEnabledExtensionNames = extensions,
