@@ -39,9 +39,7 @@ GraphicsDeviceFontCache* create_graphics_device_font_cache(Arena *arena, Graphic
 	cache->position = u32x2_set(0,0);
 	cache->max_row_height = 0;
 
-	Scratch scratch = find_scratch(0,1, &arena);
-	cache->default_font = create_graphics_device_font(arena, read_file(scratch.arena, str8_lit(BERKELEY_PATH)), cache, dpi);
-	regress_scratch(scratch);
+	cache->default_font = create_graphics_device_font(arena, read_file(arena, str8_lit(BERKELEY_PATH)), cache, dpi);
 
 	return cache;
 }
@@ -59,6 +57,7 @@ GraphicsDeviceFont *create_graphics_device_font(Arena *arena, const u8 *file_arr
 	FT_Face face = {0};
 	FT_Error fterror = {0};
 	
+	// Fun fact: This memory is not copied, so if it is modified at runtime, the font data will be changed ((<:)
 	FT_Open_Args args = {
 		.flags = FT_OPEN_MEMORY,
 		.memory_base = file_array,
@@ -247,7 +246,7 @@ void resolve_graphics_device_font_cache(GraphicsDeviceFontCache *cache)
 			graphics_device_font_compute_metrics(font, glyph->pt);
 			if((fterror = FT_Load_Char(font->face, glyph->code, FT_LOAD_RENDER)))
 			{
-				print("Failed to render bitmap\n");
+				print("Failed to render bitmap %u32 %u32\n", glyph->code, fterror);
 			}
 			FT_GlyphSlot gs = font->face->glyph;
 			u8* src = gs->bitmap.buffer;

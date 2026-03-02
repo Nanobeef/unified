@@ -4,6 +4,7 @@ typedef struct{
 	GraphicsDevice *device;
 	VkSwapchainKHR handle;
 
+	VkFormat format;
 	u32x2 size;
 	u32 image_index;
 	u32 image_count;

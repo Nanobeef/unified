@@ -1,5 +1,4 @@
 
-PolledEvents last_polled_events = {0};
 
 void press_button(Arena *arena, Button *b, u64 time, ButtonEventType action)
 {
@@ -54,16 +53,37 @@ void move_wheel(Arena *arena, Wheel *w, u64 time, f64 val)
 	w->velocity += val;
 }
 
-PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
+
+void handle_mouse_move_event(Arena *arena, Event *e, PolledEvents *pe)
 {
-	PolledEvents pe = last_polled_events;
+	e->mouse.type = MOUSE_NONE;
+	if(pe->mouse.previous)
+	{
+		Mouse *p = arena_push(arena, 0, sizeof(Mouse));
+		p->previous = p;
+		p->previous[0] = pe->mouse;
+	}	
+	else
+	{
+		pe->mouse.previous = (void*)1;
+	}
+	pe->mouse.moved = true;
+	pe->mouse.move_time = e->time;
+	pe->mouse.pixel_position.x = (f32)e->mouse.x;
+	pe->mouse.pixel_position.y = (f32)e->mouse.y;
+	pe->mouse.pixel_delta = f32x2_sub(pe->mouse.previous_pixel_position, pe->mouse.pixel_position);
+
+}
+
+u32 poll_events(Arena *arena, Event *event_ring_buffer, PolledEvents *inpe)
+{
+	PolledEvents pe = *inpe;
 	for(u32 i = 0; i < offsetof(PolledEvents, last_button) - offsetof(PolledEvents, first_button); i++)
 	{
 		Button *b = &pe.first_button + 1;
 		b->previous = 0;
 	}
 
-	pe.mouse.previous_pixel_position = pe.mouse.pixel_position;
 	pe.mouse.moved = false;
 	pe.mouse.previous = 0;
 	pe.mouse.previous_pixel_position = pe.mouse.pixel_position;
@@ -75,8 +95,10 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 	pe.window_should_resize = false;
 	pe.application_should_stop = false;
 	Event e;
+	u32 count = 0;
 	while(ring_buffer_pop(event_ring_buffer, &e))
 	{
+		count++;
 		switch(e.type)
 		{
 			case EVENT_WINDOW:{
@@ -135,22 +157,7 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 					}
 					break;
 					case MOUSE_MOVE:{
-						if(pe.mouse.previous)
-						{
-							Mouse *p = arena_push(arena, 0, sizeof(Mouse));
-							p->previous = p;
-							p->previous[0] = pe.mouse;
-						}	
-						else
-						{
-							pe.mouse.previous = (void*)1;
-						}
-						pe.mouse.moved = true;
-						pe.mouse.move_time = e.time;
-						pe.mouse.pixel_position.x = (f32)e.mouse.x;
-						pe.mouse.pixel_position.y = (f32)e.mouse.y;
-						pe.mouse.pixel_delta = f32x2_sub(pe.mouse.previous_pixel_position, pe.mouse.pixel_position);
-
+						handle_mouse_move_event(arena, &e, &pe);
 					}break;
 					default:
 					break;
@@ -223,6 +230,8 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 					}break;
 					case KEY_LEFT_CONTROL:{
 						press_key(arena, &pe.left_control, e.time, e.keyboard.type);
+							pe.mouse.pixel_delta = f32x2_add(pe.mouse.pixel_delta, f32x2_sub(pe.mouse.previous_pixel_position, pe.mouse.pixel_position));
+							pe.mouse.previous_pixel_position = pe.mouse.pixel_position;
 						press_key(arena, &pe.control, e.time, e.keyboard.type);
 					}break;
 					case KEY_RIGHT_CONTROL:{
@@ -254,6 +263,6 @@ PolledEvents poll_events(Arena *arena, Event *event_ring_buffer)
 			break;
 		}
 	}
-	last_polled_events = pe;
-	return pe;
+	*inpe = pe;
+	return count;
 }

@@ -232,5 +232,6 @@ typedef struct{
 	b32 application_should_stop;
 }PolledEvents;
 
-PolledEvents poll_events(Arena *arena, Event *event_ring_buffer);
+void handle_mouse_move_event(Arena *arena, Event *e, PolledEvents *pe);
+u32 poll_events(Arena *arena, Event *event_ring_buffer, PolledEvents *inpe);
 

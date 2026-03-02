@@ -124,6 +124,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 		.clipped = VK_FALSE,
 	};
 	GraphicsSwapchain swapchain = {.device = device, .create_info = info};
+	swapchain.format = info.imageFormat;
 	swapchain.size = u32x2_set(info.imageExtent.width, info.imageExtent.height);
 	swapchain = recreate_graphics_swapchain(arena, swapchain);
 	return swapchain;

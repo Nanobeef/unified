@@ -5,6 +5,11 @@ typedef struct{
 	f32x2 texture;
 }Vertex2;
 
+typedef struct{
+	f32x4 color;
+	f32x2 position;
+}Point2;
+
 VkShaderModule read_shader_file(GraphicsDevice *device, const char *name);
 
 
@@ -49,7 +54,7 @@ typedef struct{
 	RasterizationPipelines rasterization;
 }GraphicsPipelines;
 
-RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format);
+RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain);
 VkFramebuffer *create_rasterization_framebuffers(Arena *arena, RasterizationPipelines pipelines, u32 count, GraphicsDeviceImage *target_images, GraphicsDeviceImage *msaa_images);
 void destroy_rasterization_pipelines(RasterizationPipelines pipelines);
 void cmd_begin_rasterization_render_pass(GraphicsCommandBuffer cb, VkRenderPass render_pass, VkFramebuffer framebuffer, u32x2 size, f32x4 color);

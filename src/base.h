@@ -23,6 +23,9 @@ typedef s32 b32;
 typedef float f32;
 typedef double f64;
 
+#define PI 3.14159265359
+#define PI2 6.28318530718
+
 #define U8_MAX UINT8_MAX
 #define U16_MAX UINT16_MAX
 #define U32_MAX UINT32_MAX
@@ -64,6 +67,17 @@ static u64 next_power_of_two(u64 x)
     x |= x >> 32;
     x++;
     return x;
+}
+
+static u64 most_significant_bit(u64 a)
+{
+	u32 b = 0;
+	for(u32 i = 0; i < 64; i++)
+	{
+		if((a & (1<<i)) > b)
+			b = (1<<i);
+	}
+	return b;
 }
 
 #define Align( x ) (__attribute__((aligned(x))))

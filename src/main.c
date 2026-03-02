@@ -48,7 +48,7 @@
 #include "vk_font.h"
 #include "vk_vertex_buffer.h"
 #include "vk_draw.h"
-
+#include "pile.h"
 
 #include "vk_instance.c"
 #include "vk_device.c"
@@ -165,12 +165,13 @@ s32 main(void)
 	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
 
-	GraphicsEvent *font_cache_events = create_graphics_events(main_arena, device, frame_count);
 
 
-	VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
-	VkSampleCountFlags sample_count = VK_SAMPLE_COUNT_8_BIT;
-	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format);
+	VkFormat target_format = VK_FORMAT_B8G8R8A8_SRGB;
+	VkImageFormatProperties target_format_properties;
+	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
+	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
+	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format, target_format == swapchain.format);
 
 	GraphicsDeviceFontCache *font_cache = create_graphics_device_font_cache(main_arena, device, window->screen_dpi);
 
@@ -178,7 +179,7 @@ s32 main(void)
 	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceVertexBuffer, overlay_vertex_buffers);
 	for(u32 i = 0; i < frame_count; i++)
 	{
-		u64 vb_size = MiB(16);
+		u64 vb_size = MiB(64);
 		world_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, vb_size, sizeof(Vertex2), font_cache);
 		overlay_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, vb_size, sizeof(Vertex2), font_cache);
 	}
@@ -189,7 +190,11 @@ s32 main(void)
 		msaa_images = arena_push(main_arena, 0, max_swapchain_image_count * sizeof(GraphicsDeviceImage));
 	for(u32 i = 0; i < swapchain.image_count; i++)
 	{
-		target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+		if(target_format == swapchain.create_info.imageFormat)
+			target_images[i] = swapchain.images[i];
+		else
+			target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
 		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 			msaa_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL, sample_count);
 	}
@@ -255,8 +260,10 @@ s32 main(void)
 
 
 	tidings.desired_frame_time = window->refresh_rate;
-	u64 frame_start_time = get_epoch_ns();;
+	u64 frame_start_time = get_epoch_ns() - tidings.desired_frame_time;
 	u64 frame_end_time = 0;
+	b32 just_resized = false;
+	PolledEvents pe = {0};
 	while(true)
 	{
 		frame_end_time = get_epoch_ns();
@@ -267,9 +274,11 @@ s32 main(void)
 		{
 			frame_sleep_time = tidings.desired_frame_time - tidings.frame_elapsed_time;
 
+
 			u64 us = frame_sleep_time / 1000;
 			usleep(us);
 		}
+
 		frame_start_time = end_time(&tidings.frame_sleep_time);
 		tidings.frame_time = tidings.frame_elapsed_time + tidings.frame_sleep_time;
 		
@@ -278,10 +287,9 @@ s32 main(void)
 		reset_arena(frame_arena);
 
 		poll_window(window, event_ring_buffer);
-		PolledEvents pe = poll_events(frame_arena, event_ring_buffer);
+		poll_events(frame_arena, event_ring_buffer, &pe);
 		if(pe.escape.pressed)
 			break;
-		update_camera(&camera, pe, window->size, false);
 		fixed_camera = create_fixed_camera(window->size);
 
 
@@ -306,7 +314,8 @@ s32 main(void)
 				{
 					if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 						destroy_graphics_device_image(msaa_images[i]);
-					destroy_graphics_device_image(target_images[i]);
+					if(swapchain.format != target_format)
+						destroy_graphics_device_image(target_images[i]);
 					vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
 				}
 				
@@ -314,7 +323,10 @@ s32 main(void)
 
 				for(u32 i = 0; i < swapchain.image_count; i++)
 				{
-					target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+					if(target_format == swapchain.create_info.imageFormat)
+						target_images[i] = swapchain.images[i];
+					else
+						target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 					if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 						msaa_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL, sample_count);
 				}
@@ -323,6 +335,8 @@ s32 main(void)
 				destroy_graphics_semaphore(swapchain_semaphores[frame_index]);
 				swapchain_semaphores[frame_index] = create_graphics_semaphore(device);
 				tidings.resize_time = record_time();
+				frame_start_time = get_epoch_ns() - tidings.desired_frame_time;
+				just_resized = true;
 				continue;
 			}
 			image_index = swapchain.image_index;
@@ -333,27 +347,42 @@ s32 main(void)
 		tidings.poll_time = record_time();
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
-			String8 str;
-			Scratch scratch = find_scratch(0,0,0);
-			str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
-			"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
-			tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
-			tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
-			tidings.cb_wait_time, tidings.cb_record_time);
-			draw_str8_wrap(vb, fixed_camera, f32x2_set(1,0), window->size.x, str, 16, f32x4_color_white);
-			regress_scratch(scratch);
+			{
+				String8 str;
+				Scratch scratch = find_scratch(0,0,0);
+				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
+				"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
+				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
+				tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
+				tidings.cb_wait_time, tidings.cb_record_time);
+				draw_str8_wrap(vb, fixed_camera, f32x2_set(1,0), window->size.x, str, 16, f32x4_color_white);
+				regress_scratch(scratch);
+			}
+
+
+
 			end_graphics_device_vertex_buffer(vb);
 		}
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
+			RomuQuad rq = romu_quad_seed(0);
+			f32 radius = 0.9;
+			for(u32 i = 0; i < 1000; i++)
+			{
+				f32x2 p;
+				f32 r = fabs(romu_quad_f32(&rq)) * 0.1 + 0.01;
+				do{
+					p = romu_quad_f32x2(&rq);
+				}while(f32x2_length(p) < radius + r);
+				s32 n = 16;
+				draw_circle(vb, Max(n, 5), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.0));
+			}
 			
-			RomuQuad rq = romu_quad_seed(epoch_time_ns);
 			u64 triangle_count = 10000;
 			for(u32 i = 0; i < triangle_count * 3; i+=3)
 			{
 				f32x2 point;
-				f32 radius = 0.9;
 				do{
 					point = romu_quad_f32x2(&rq);
 					point = f32x2_mul1(point, radius);
@@ -418,7 +447,7 @@ s32 main(void)
 				cmd_graphics_pipeline_barrier(cb, barrier);
 			}
 
-			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.01, 0.01, 0.01, 1.0));
+			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.00, 0.00, 0.00, 1.0));
 			{
 				VkRect2D scissor = {
 					.offset = {0,0},
@@ -434,6 +463,23 @@ s32 main(void)
 				};
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
+			if(1)
+			{
+				// I sill need to test this, and refactor it.
+				if(poll_window(window, event_ring_buffer))
+				{
+					RingBuffer *rb = (RingBuffer*)event_ring_buffer - 1;
+					for(u32 i = rb->b; i != rb->a; i = (i+1) & rb->mask)
+					{
+						Event *e = event_ring_buffer + i;
+						if(e->type == EVENT_MOUSE && e->mouse.type == MOUSE_MOVE)
+						{
+							handle_mouse_move_event(frame_arena, e, &pe);
+						}
+					}
+				}
+			}
+			update_camera(&camera, pe, window->size, false);
 			{
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
 
@@ -450,44 +496,45 @@ s32 main(void)
 			}
 			vkCmdEndRenderPass(cb.handle);
 
+			if(target_format != swapchain.format)
 			{
-				GraphicsImageMemoryBarrier image_barrier = {
-					.image = swapchain_image,
-					.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-					.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					.src_access = VK_ACCESS_NONE,
-					.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
-				};
+				{
+					GraphicsImageMemoryBarrier image_barrier = {
+						.image = swapchain_image,
+						.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+						.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						.src_access = VK_ACCESS_NONE,
+						.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+					};
 
-				GraphicsPipelineBarrier barrier = {
-					.image_memory_barrier_count = 1,
-					.image_memory_barriers = &image_barrier,
-					.src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-					.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-				};
-				
-				cmd_graphics_pipeline_barrier(cb, barrier);
-			}
+					GraphicsPipelineBarrier barrier = {
+						.image_memory_barrier_count = 1,
+						.image_memory_barriers = &image_barrier,
+						.src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+						.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+					};
+					
+					cmd_graphics_pipeline_barrier(cb, barrier);
+				}
+				cmd_blit_graphics_device_image(cb, target_image, swapchain_image);
+				{
+					GraphicsImageMemoryBarrier image_barrier = {
+						.image = swapchain_image,
+						.old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+						.src_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+						.dst_access = VK_ACCESS_NONE,
+					};
 
-			cmd_blit_graphics_device_image(cb, target_image, swapchain_image);
-
-			{
-				GraphicsImageMemoryBarrier image_barrier = {
-					.image = swapchain_image,
-					.old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-					.src_access = VK_ACCESS_TRANSFER_WRITE_BIT,
-					.dst_access = VK_ACCESS_NONE,
-				};
-
-				GraphicsPipelineBarrier barrier = {
-					.image_memory_barrier_count = 1,
-					.image_memory_barriers = &image_barrier,
-					.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
-					.dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-				};
-				
-				cmd_graphics_pipeline_barrier(cb, barrier);
+					GraphicsPipelineBarrier barrier = {
+						.image_memory_barrier_count = 1,
+						.image_memory_barriers = &image_barrier,
+						.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+						.dst_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+					};
+					
+					cmd_graphics_pipeline_barrier(cb, barrier);
+				}
 			}
 
 			end_graphics_command_buffer(cb);
@@ -515,7 +562,8 @@ s32 main(void)
 	for(u32 i = 0; i < swapchain.image_count; i++)
 	{
 		vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
-		destroy_graphics_device_image(target_images[i]);
+		if(swapchain.format != target_format)
+			destroy_graphics_device_image(target_images[i]);
 		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 			destroy_graphics_device_image(msaa_images[i]);
 			
@@ -527,7 +575,6 @@ s32 main(void)
 		destroy_graphics_device_vertex_buffer(world_vertex_buffers[i]);
 		destroy_graphics_device_vertex_buffer(overlay_vertex_buffers[i]);
 	}
-	destroy_graphics_events(frame_count, font_cache_events);
 
 	destroy_rasterization_pipelines(rasterization_pipelines);
 	destroy_graphics_semaphores(frame_count, swapchain_semaphores);

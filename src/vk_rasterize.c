@@ -39,9 +39,8 @@ VkShaderModule read_shader_file(GraphicsDevice *device, const char *name)
 
 
 
-RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format)
+RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain)
 {
-	
 	RasterizationPipelines pipelines = 	{
 		.device = device,
 		.format = format,
@@ -68,6 +67,15 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		};
 		VK_ASSERT(vkCreateSampler(device->handle, &info, vkb, &pipelines.mono_sampler));
 	}
+	VkImageLayout final_image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	VkImageLayout final_image_access = VK_ACCESS_TRANSFER_READ_BIT;
+	VkImageLayout final_image_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	if(direct_to_swapchain)
+	{
+		final_image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		final_image_access = VK_ACCESS_NONE;
+		final_image_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
 	if(pipelines.sample_count == VK_SAMPLE_COUNT_1_BIT){
 		VkAttachmentReference color_reference = {
 			.attachment = 0,
@@ -81,7 +89,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 				.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				.finalLayout = final_image_layout,
 			},
 		};
 
@@ -98,9 +106,9 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 				.srcSubpass = 0,
 				.dstSubpass = VK_SUBPASS_EXTERNAL,
 				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT,
+				.dstStageMask = final_image_stage,
 				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+				.dstAccessMask = final_image_access,
 				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
 			},
 		};
@@ -144,7 +152,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 				.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				.finalLayout = final_image_layout,
 			},
 		};
 
@@ -162,9 +170,9 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 				.srcSubpass = 0,
 				.dstSubpass = VK_SUBPASS_EXTERNAL,
 				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT,
+				.dstStageMask = final_image_stage,
 				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-				.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+				.dstAccessMask = final_image_access,
 				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
 			},
 		};
