@@ -133,6 +133,7 @@ typedef struct{
 #define p2( A , B ) {str8_lit(#A), PRINT_KEYWORD_##B}
 
 PrintKeyword keywords[] = {
+	p2(s, String8),
 	p1(u8),
 	p1(u16),
 	p1(u32),
@@ -149,7 +150,6 @@ PrintKeyword keywords[] = {
 	p1(u32x2),
 	p1(s32x2),
 	p1(f32x2),
-	p2(s, String8),
 	p2(cs, Cstring),
 
 	p2(et, EpochTime),
@@ -239,7 +239,9 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 		String8 d = *(String8*)data;
 		u32 i = 0;
 		for(; i < Min(d.len, size); i++) 
+		{
 			dst[i] = d.data[i]; 
+		}
 		len = i;
 	}break;
 	case PRINT_KEYWORD_Cstring:{

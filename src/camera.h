@@ -25,6 +25,13 @@ typedef struct{
 	u64 transition_start;
 	u64 transition_end;
 	b32 transition;
+
+	f32x2 top_left;
+	f32x2 bottom_right;
+	f32x2 top_right;
+	f32x2 bottom_left;
+
+	f32x2 center;
 }Camera;
 
 void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force_disable);

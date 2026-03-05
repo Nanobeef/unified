@@ -74,7 +74,7 @@ void end_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb)
 	flush_graphics_device_memory(vb->buffer.memory);
 }
 
-void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb)
+u64 cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb)
 {
 	if(vb.index_count)
 	{
@@ -83,5 +83,7 @@ void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDe
 		vkCmdBindIndexBuffer(cb.handle, vb.buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(cb.handle, vb.index_count, 1, 0, 0, 0);
 	}
+	return vb.vertex_stride * vb.vertex_count + vb.index_stride * vb.index_count;
 }
+
 

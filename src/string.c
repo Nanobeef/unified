@@ -29,7 +29,7 @@ char *cstr_str8(Arena *arena, String8 str)
 
 String8 str8_concatenate(Arena *arena, u32 count, const String8 *strings)
 {
-	u64 total_len = 1;
+	u64 total_len = 0;
 	for(u32 i = 0; i < count; i++)
 	{
 		total_len += strings[i].len;
@@ -48,7 +48,7 @@ String8 str8_concatenate(Arena *arena, u32 count, const String8 *strings)
 
 String8 str8_concatenate_and_seperate(Arena *arena, u32 count, const String8 *strings, String8 seperator)
 {
-	u64 total_len = 1;
+	u64 total_len = 0;
 	for(u32 i = 0; i < count; i++)
 	{
 		total_len += strings[i].len;
@@ -77,7 +77,7 @@ String8 str8_concatenate_and_seperate(Arena *arena, u32 count, const String8 *st
 
 String8 str8_concatenate_and_decorate(Arena *arena, u32 count, const String8 *strings, String8 seperator, String8 prefix, String8 postfix)
 {
-	u64 total_len = 1;
+	u64 total_len = 0;
 	total_len += prefix.len;
 	total_len += postfix.len;
 	for(u32 i = 0; i < count; i++)

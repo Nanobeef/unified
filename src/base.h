@@ -80,6 +80,17 @@ static u64 most_significant_bit(u64 a)
 	return b;
 }
 
+static u32 popcount(u64 a)
+{
+	u32 c = 0;
+	for(u32 i = 0; i < 64; i++)
+	{
+		if((a>>i)&1)
+			c++;
+	}
+	return c;
+}
+
 #define Align( x ) (__attribute__((aligned(x))))
 
 

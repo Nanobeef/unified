@@ -150,6 +150,13 @@ void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force
 		f32m3_affine_scale(camera->current_zoom * camera->aspect, camera->current_zoom),
 		f32m3_affine_translate(camera->current_pan.x, camera->current_pan.y)
 	);
+	camera->inverse_affine = f32m3_affine_inverse(camera->current_affine);
+
+	camera->top_left = f32x2_mul_f32m3(f32x2_set(-1.0, -1.0), camera->inverse_affine);
+	camera->top_right = f32x2_mul_f32m3(f32x2_set(1.0, -1.0), camera->inverse_affine);
+	camera->bottom_right = f32x2_mul_f32m3(f32x2_set(1.0, 1.0), camera->inverse_affine);
+	camera->bottom_left = f32x2_mul_f32m3(f32x2_set(-1.0, 1.0), camera->inverse_affine);
+	camera->center = f32x2_mul_f32m3(f32x2_set(0.0, 0.0), camera->inverse_affine);
 }
 
 FixedCamera create_fixed_camera(u32x2 pixel_size)

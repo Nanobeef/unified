@@ -30,5 +30,5 @@ GraphicsDeviceVertexBuffer *begin_graphics_device_vertex_buffer(GraphicsDeviceVe
 void end_graphics_device_vertex_buffer(GraphicsDeviceVertexBuffer *vb);
 
 
-void cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb);
+u64 cmd_draw_graphics_device_vertex_buffer(GraphicsCommandBuffer cb, GraphicsDeviceVertexBuffer vb);
 

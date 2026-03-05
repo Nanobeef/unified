@@ -2,39 +2,37 @@
 
 
 
+
 typedef struct{
-// Graphics
 	GraphicsInstance *instance;
 	GraphicsDevice *device;
 	GraphicsSurface *surface;
-
 	GraphicsSwapchain swapchain;
-	
-		
-}State;
-State s = {0};
+	Arena *arena;
+}GraphicsArena;
 
+typedef struct{
+	Arena *arena;
+}FrameArena;
 
-typedef enum{
-	MAIN_PILE,
-	GRAPHICS_PILE,
-	AUDIO_PILE,
-	SIM_PILE,
-}PileType;
+typedef struct{
+	Window *window;
+	GraphicsSurface surface;
+	Arena *arena;
+}SurfaceArena;
 
-typedef enum{
-	MAIN_PILEUP_INIT,	
-}MainPileupType;
+typedef struct{
+	Arena *arena;
+}SimArena;
 
-typedef enum{
-	MAIN_PILEDOWN_CLEANUP = MAIN_PILEUP_INIT,
-}MainPiledownType;
+typedef struct{
+	Arena *arena;
+}UpdateArena;
 
+typedef struct{
+	Arena *arena;
+}ProcessArena;
 
-typedef enum{
-	GRAPHICS_PILEUP_INSTANCE,	
-	GRAPHICS_PILEUP_DEVICE,	
-	GRAPHICS_PILEUP_SURFACE,
-	GRAPHICS_PILEUP_RENDER,
-	GRAPHICS_PILEUP_FRAME,
-}GraphicsPileup;
+typedef struct{
+
+}AudioArena;

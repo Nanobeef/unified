@@ -49,6 +49,7 @@
 #include "vk_vertex_buffer.h"
 #include "vk_draw.h"
 #include "pile.h"
+#include "vk_query.h"
 
 #include "vk_instance.c"
 #include "vk_device.c"
@@ -68,6 +69,7 @@
 #include "vk_font.c"
 #include "vk_descriptor.c"
 #include "vk_draw.c"
+#include "vk_query.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -88,6 +90,8 @@ u64 epoch_time_ns;
 #include "print.c"
 #include "window.c"
 #include "collatz.c"
+
+#include <alsa/asoundlib.h>
 
 void init(void)
 {
@@ -118,6 +122,79 @@ void cleanup(void)
 s32 main(void)
 {
 	init();
+
+	if(0){
+		snd_pcm_t *pcm;
+		if(snd_pcm_open(&pcm, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0)
+		{
+			print("Failed to open alsa driver\n");
+			goto SOUND_END;
+		}
+
+		u32 sample_rate = 48000;
+		u64 period_size = 256;
+		u64 buffer_size = period_size * 4;
+
+		snd_pcm_hw_params_t *params;
+		snd_pcm_hw_params_alloca(&params);
+		snd_pcm_hw_params_any(pcm, params);
+		snd_pcm_hw_params_set_access(pcm, params, SND_PCM_ACCESS_RW_INTERLEAVED);
+		snd_pcm_hw_params_set_format(pcm, params, SND_PCM_FORMAT_FLOAT_LE);
+		snd_pcm_hw_params_set_channels(pcm, params, 2);
+		snd_pcm_hw_params_set_rate_near(pcm, params, &sample_rate, 0);
+		snd_pcm_hw_params_set_period_size_near(pcm, params, &period_size, 0);
+		snd_pcm_hw_params_set_buffer_size_near(pcm, params, &buffer_size);
+
+		snd_pcm_hw_params(pcm, params);
+
+
+
+
+		f32 duration = 1.0;
+		f32 amplitude = 1.0;
+		u64 total_frames = (u64)(duration * sample_rate);
+		f32 *buffer = arena_push(main_arena, true, total_frames * 2 * sizeof(f32));
+
+		f32 frequency = 440.0;
+		f32 phase = 0.0;	
+		f32 phase_inc = 2.0 * PI2 * frequency / sample_rate;
+
+		for(u64 i = 0; i < total_frames; i++)
+		{
+			f32 sample = sin(phase) * amplitude;
+			f32 s = sample;
+
+			buffer[i * 2 + 0] = s;
+			buffer[i * 2 + 1] = s;
+			phase += phase_inc;
+			if(phase >= 2.0 * PI2) 
+				phase -= 2.0 * PI2;
+		}
+
+		u64 frames_written = 0;
+		while(frames_written < total_frames)
+		{
+			s64 written = snd_pcm_writei(pcm, buffer + frames_written * 2, total_frames - frames_written);
+
+			if(written < 0)
+			{
+				print("fail\n");
+				if(written == -EPIPE)
+					snd_pcm_recover(pcm, written, 0);
+				else
+					break;
+			}
+			else
+			{
+				frames_written += written;
+			}
+
+		}
+		SOUND_END:
+		snd_pcm_drain(pcm);
+		snd_pcm_close(pcm);
+	}
+
 	tidings.startup_time = mark_time();
 	Window *window = create_window(main_arena);
 	tidings.window_create_time = record_time();
@@ -135,6 +212,7 @@ s32 main(void)
 	u32 frame_count = 2;
 	u64 frame_accum = 0;
 	u64 frame_index = 0;
+	u64 last_frame_index = 1;
 
 	arena_push_type(main_arena, 0, frame_count * 2, Arena*, frame_arenas);
 	for(u32 i = 0; i < frame_count * 2; i++)
@@ -142,7 +220,6 @@ s32 main(void)
 		u64 size = MiB(64);
 		frame_arenas[i] = init_arena(size, arena_push(main_arena, 0, size));
 	}
-
 
 	u32 resize_count = 2;
 	u64 resize_accum = 0;
@@ -165,9 +242,8 @@ s32 main(void)
 	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
 
-
-
 	VkFormat target_format = VK_FORMAT_B8G8R8A8_SRGB;
+	//VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
 	VkImageFormatProperties target_format_properties;
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
@@ -254,7 +330,20 @@ s32 main(void)
 		);
 
 	}
+
+
 	
+	arena_push_type(main_arena, false, frame_count, GraphicsQueryPool, timestamp_query_pools);
+	arena_push_type(main_arena, false, frame_count, GraphicsQueryPool, invocation_query_pools);
+	for(u32 i = 0; i < frame_count; i++)
+	{
+		timestamp_query_pools[i] = create_graphics_query_pool(main_arena, device, VK_QUERY_TYPE_TIMESTAMP, 64, 0);
+		invocation_query_pools[i] = create_graphics_query_pool(main_arena, device, VK_QUERY_TYPE_PIPELINE_STATISTICS, 64, 
+		VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT
+		);
+	}
+
 
 	end_time(&tidings.startup_time);
 
@@ -264,6 +353,7 @@ s32 main(void)
 	u64 frame_end_time = 0;
 	b32 just_resized = false;
 	PolledEvents pe = {0};
+	u64 vertex_data_size = 0;
 	while(true)
 	{
 		frame_end_time = get_epoch_ns();
@@ -282,6 +372,7 @@ s32 main(void)
 		frame_start_time = end_time(&tidings.frame_sleep_time);
 		tidings.frame_time = tidings.frame_elapsed_time + tidings.frame_sleep_time;
 		
+		last_frame_index = frame_index;
 		frame_index = frame_accum % frame_count;
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
 		reset_arena(frame_arena);
@@ -345,41 +436,38 @@ s32 main(void)
 
 		}
 		tidings.poll_time = record_time();
-		{
-			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
-			{
-				String8 str;
-				Scratch scratch = find_scratch(0,0,0);
-				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
-				"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
-				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
-				tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
-				tidings.cb_wait_time, tidings.cb_record_time);
-				draw_str8_wrap(vb, fixed_camera, f32x2_set(1,0), window->size.x, str, 16, f32x4_color_white);
-				regress_scratch(scratch);
-			}
-
-
-
-			end_graphics_device_vertex_buffer(vb);
-		}
+		update_camera(&camera, pe, window->size, false);
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
 			RomuQuad rq = romu_quad_seed(0);
 			f32 radius = 0.9;
-			for(u32 i = 0; i < 1000; i++)
+			for(u32 i = 0; i < 30000; i++)
 			{
 				f32x2 p;
-				f32 r = fabs(romu_quad_f32(&rq)) * 0.1 + 0.01;
+				f32 r = fabs(romu_quad_f32(&rq)) * 0.01 + 0.01;
+				u32 try_count = 0;
 				do{
+					try_count++;
 					p = romu_quad_f32x2(&rq);
-				}while(f32x2_length(p) < radius + r);
-				s32 n = 16;
+				}while(f32x2_length(p) > radius + r);
+				s32 n = 32;
+				f32 left = camera.top_left.x;
+				f32 top = camera.top_left.y;
+				f32 right = camera.bottom_right.x;
+				f32 bottom = camera.bottom_right.y;
+				if(p.x + r < left)
+					continue;
+				if(p.x - r > right)
+					continue;
+				if(p.y + r < top)
+					continue;
+				if(p.y - r > bottom)
+					continue;
 				draw_circle(vb, Max(n, 5), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.0));
 			}
 			
-			u64 triangle_count = 10000;
+			u64 triangle_count = 0;
 			for(u32 i = 0; i < triangle_count * 3; i+=3)
 			{
 				f32x2 point;
@@ -387,6 +475,7 @@ s32 main(void)
 					point = romu_quad_f32x2(&rq);
 					point = f32x2_mul1(point, radius);
 				}while(f32x2_length(point) > radius);
+				point = camera.center;
 
 				f64 d = romu_quad_f64(&rq);
 				int ds = signbit(d);
@@ -423,10 +512,61 @@ s32 main(void)
 		resolve_graphics_device_font_cache(font_cache);
 		tidings.font_resolve_time = record_time();
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
+		{
+			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
+			u64 draw_time = 0;
+			{
+				String8 str;
+				Scratch scratch = find_scratch(0,0,0);
+				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
+				"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
+				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
+				tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
+				tidings.cb_wait_time, tidings.cb_record_time);
+				f32x2 pen = f32x2_set(1,0);
+				pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
+
+				{
+					TimestampQueryResult *results = get_graphics_timestamp_query_pool_results(scratch.arena, timestamp_query_pools[last_frame_index]);
+					str = str8_print(scratch.arena, "Queue:\n");
+					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
+					for(u32 i = 0; i < USED(results); i++)
+					{
+						str = str8_print(scratch.arena, " %s \t%tus\n",results[i].name, results[i].elapsed);
+						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
+						if(str8_equal(results[i].name, str8_lit("Draw World")))
+							draw_time += results[i].elapsed;
+						else if(str8_equal(results[i].name, str8_lit("Draw Overlay")))
+							draw_time += results[i].elapsed;
+					}
+
+				}
+				{
+					PipelineStatisticQueryResult *results = get_graphics_pipeline_statistic_query_pool_results(scratch.arena, invocation_query_pools[last_frame_index]);
+					for(u32 i = 0; i < USED(results); i++)
+					{
+						str = str8_print(scratch.arena, "%s = %u64\n", results[i].name, results[i].count);
+						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
+					}
+				}
+				{
+					f64 rate = ((f64)vertex_data_size / (f64)GiB(1)) / ((f64)draw_time / 1000000000.0);
+					str = str8_print(scratch.arena, "Transfer Rate = %f64 GiB/s\n", rate);
+					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
+				}
+				regress_scratch(scratch);
+			}
+
+			end_graphics_device_vertex_buffer(vb);
+		}
 		tidings.cb_wait_time = record_time();
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 		{
 			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+
+			cmd_reset_graphics_query_pool(cb, timestamp_query_pools[frame_index]);
+			cmd_reset_graphics_query_pool(cb, invocation_query_pools[frame_index]);
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Buffer"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 			vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 1, &frame_descriptor_pools[frame_index]->descriptor_sets[0].handle, 0,0);
 
 			{
@@ -447,6 +587,8 @@ s32 main(void)
 				cmd_graphics_pipeline_barrier(cb, barrier);
 			}
 
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Render Pass"), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+
 			cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.00, 0.00, 0.00, 1.0));
 			{
 				VkRect2D scissor = {
@@ -463,7 +605,7 @@ s32 main(void)
 				};
 				vkCmdSetViewport(cb.handle, 0,1,&viewport);
 			}
-			if(1)
+			if(0)
 			{
 				// I sill need to test this, and refactor it.
 				if(poll_window(window, event_ring_buffer))
@@ -479,25 +621,37 @@ s32 main(void)
 					}
 				}
 			}
-			update_camera(&camera, pe, window->size, false);
 			{
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
 
+				vertex_data_size = 0;
 				{
 					f32m3p mp = f32m3_padding(camera.current_affine);
 					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
-					cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
+
+					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+					vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+					cmd_end_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 				}
 				{
 					f32m3p mp = f32m3_padding(fixed_camera.affine);
 					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
-					cmd_draw_graphics_device_vertex_buffer(cb, overlay_vertex_buffers[frame_index]);
+
+					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay"));
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+					vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, overlay_vertex_buffers[frame_index]);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+					cmd_end_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay"));
 				}
 			}
 			vkCmdEndRenderPass(cb.handle);
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Render Pass"), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
 			if(target_format != swapchain.format)
 			{
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("BLIT"), VK_PIPELINE_STAGE_TRANSFER_BIT);
 				{
 					GraphicsImageMemoryBarrier image_barrier = {
 						.image = swapchain_image,
@@ -534,9 +688,11 @@ s32 main(void)
 					};
 					
 					cmd_graphics_pipeline_barrier(cb, barrier);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("BLIT"), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 				}
 			}
 
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Buffer"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 			end_graphics_command_buffer(cb);
 			tidings.cb_record_time = record_time();
 
@@ -574,6 +730,8 @@ s32 main(void)
 		destroy_graphics_descriptor_pool(frame_descriptor_pools[i]);
 		destroy_graphics_device_vertex_buffer(world_vertex_buffers[i]);
 		destroy_graphics_device_vertex_buffer(overlay_vertex_buffers[i]);
+		destroy_graphics_query_pool(timestamp_query_pools[i]);
+		destroy_graphics_query_pool(invocation_query_pools[i]);
 	}
 
 	destroy_rasterization_pipelines(rasterization_pipelines);

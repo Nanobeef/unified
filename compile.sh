@@ -15,7 +15,7 @@ fi
 
 
 
-libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lxcb-randr -lfreetype -I/usr/include/freetype2 -D_GNU_SOURCE "
+libraries=" -lm -lpthread -lvulkan -lxcb -lxcb-keysyms -lxcb-randr -lfreetype -I/usr/include/freetype2 -lasound -D_GNU_SOURCE "
 
 TIME=$(get_time_us)
 if [[ "$compiler" = "GCC" ]]; then
