@@ -41,6 +41,8 @@ typedef struct Thread{
 	u64 marked_time;
 	u64 recorded_time;
 
+	void *ui_data;
+
 	atomic void *data;
 
 	Semaphore working_semaphore;

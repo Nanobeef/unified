@@ -11,17 +11,16 @@ void draw_rectangle(GraphicsDeviceVertexBuffer *vb, f32x2 p[2], f32x2 t[2], f32x
 void draw_quad(GraphicsDeviceVertexBuffer *vb, f32x2 p[4], f32x2 t[4], f32x4 c[4]);
 void draw_circle(GraphicsDeviceVertexBuffer *vb, u32 n, f32x2 p, f32 pr, f32x2 t, f32 tr, f32x4 center_color, f32x4 outer_color);
 
-void draw_rectangle_outline(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 outer_points[2], f32x2 t[2], f32x4 c);
-void draw_triangle_outline(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 outer_points[3], f32x2 t[3], f32x2 c);
-void draw_circle_outline(GraphicsDeviceVertexBuffer *vb, u32 n, f32 p, f32 inner_pr, f32 outer_pr, f32x2 t, f32 tr, f32x4 inner_color, f32x2 outer_color);
+//void draw_rectangle_outline(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 outer_points[2], f32x2 t[2], f32x4 c);
+//void draw_triangle_outline(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 outer_points[3], f32x2 t[3], f32x2 c);
+//void draw_circle_outline(GraphicsDeviceVertexBuffer *vb, u32 n, f32 p, f32 inner_pr, f32 outer_pr, f32x2 t, f32 tr, f32x4 inner_color, f32x2 outer_color);
 
+u32 perfect_rounding(Camera camera, f32 radius);
 void draw_rounded_rectangle(GraphicsDeviceVertexBuffer *vb, u32 n, f32 r, f32x2 p[2], f32x2 t[2], f32x4 c);
 void draw_rounded_rectangle_outline(GraphicsDeviceVertexBuffer *vb, u32 n, f32 r, f32 thickness, f32x2 p[2], f32x2 t[2], f32x4 c);
 
-
-
-void draw_line(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 p[2]);
-void draw_rounded_line(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 p[2]);
+//void draw_line(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 p[2]);
+//void draw_rounded_line(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 p[2]);
 
 
 

@@ -4,18 +4,17 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 Low Priority:
 	- Can currently set main thread to be the highest indexed physical thread. Still need to check for Intel differing core types and set for highest "P" thread index.
 	- Array of affine matrices passed as a host-coherent uniform buffer, use push constants for index.
+
+
+
+Pile
+
+Build System
+
+Text Editor
+
+Boid Game
+

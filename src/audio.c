@@ -128,8 +128,14 @@ void *audio_thread(Thread *thread)
 
 AudioDevice* create_audio_device(Arena *arena)
 {
-	snd_seq_t *seq;
+	snd_seq_t *seq = 0;
 	snd_seq_open(&seq, "default", SND_SEQ_OPEN_INPUT, 0);
+	if(seq == 0)
+	{
+		print("Failed to create ALSA sequencer.\n");
+		return 0;
+	}
+
 	snd_seq_set_client_name(seq, "Synth for Unified");
 	s32 input_port = snd_seq_create_simple_port(seq, "input",
 			SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
@@ -217,6 +223,8 @@ AudioDevice* create_audio_device(Arena *arena)
 
 void destroy_audio_device(AudioDevice *device)
 {
+	if(device == 0)
+		return;
 	
 	atomic_store(&device->run_thread, false);
 	lock_mutex(&device->mutex);
@@ -235,6 +243,8 @@ void destroy_audio_device(AudioDevice *device)
 
 u32 poll_audio_device(AudioDevice *device, Event *event_ring_buffer)
 {
+	if(device == 0)
+		return 0;
 	snd_seq_event_t *ev = NULL;
 	u32 event_count = 0;
 	u64 time = get_time_ns();

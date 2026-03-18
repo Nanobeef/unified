@@ -53,7 +53,6 @@
 
 #include "f32x16.h"
 
-
 static f32x2 f32x2_cast_u32x2(u32x2 a)
 {
 	return f32x2_set(a.x, a.y);

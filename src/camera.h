@@ -1,5 +1,22 @@
 
 
+
+typedef struct{
+	u32x2 pixel_size;
+	f32x2 unit_pixel;
+
+	f32x2 top_left;
+	f32x2 bottom_right;
+	f32x2 top_right;
+	f32x2 bottom_left;
+
+	f32x2 center;
+
+	f32m3 affine;
+}FixedCamera;
+
+FixedCamera create_fixed_camera(u32x2 pixel_size);
+
 typedef struct{
 	f32m3 src_affine;
 	f32m3 dst_affine;
@@ -26,30 +43,18 @@ typedef struct{
 	u64 transition_end;
 	b32 transition;
 
+// Computed after the inverse affine matrix.
+
 	f32x2 top_left;
 	f32x2 bottom_right;
 	f32x2 top_right;
 	f32x2 bottom_left;
 
 	f32x2 center;
+
+	f32x2 pixel_size;
+	f32x2 unit_pixel;
+
 }Camera;
 
 void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force_disable);
-
-
-typedef struct{
-	u32x2 pixel_size;
-	f32x2 unit_pixel;
-
-	f32x2 top_left;
-	f32x2 bottom_right;
-	f32x2 top_right;
-	f32x2 bottom_left;
-
-	f32x2 center;
-
-	f32m3 affine;
-}FixedCamera;
-
-FixedCamera create_fixed_camera(u32x2 pixel_size);
-

@@ -1,38 +1,49 @@
-#include "base.h"
-#include "vector.h"
-#include "time.h"
-#include "arena.h"
-#include "string.h"
-#include "process.h"
-#include "print.h"
-#include "thread.h"
-#include "file.h"
-#include "event.h"
-#include "info.h"
-#include "random.h"
+// EXTERNAL
+	#include <xcb/xcb_keysyms.h>
+	#include <xcb/xproto.h>
+	#include <xcb/randr.h>
+	#include <X11/keysym.h>
 
-#include <dirent.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sched.h>
+	#define VK_USE_PLATFORM_XCB_KHR
+	#include <vulkan/vulkan.h>
 
-#define VK_USE_PLATFORM_XCB_KHR
-#include <vulkan/vulkan.h>
+	#include <ft2build.h>
+	#include FT_FREETYPE_H
 
-#include <xcb/xcb_keysyms.h>
-#include <xcb/xproto.h>
-#include <xcb/randr.h>
-#include <X11/keysym.h>
+// PROCESS
+	#include <dirent.h>
+	#include <sys/stat.h>
+	#include <fcntl.h>
+	#include <unistd.h>
+	#include <sched.h>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+// BASE
+	#include "base.h"
+	#include "vector.h"
+	#include "time.h"
+	#include "arena.h"
+	#include "string.h"
+	#include "process.h"
+	#include "print.h"
+	#include "thread.h"
+	#include "file.h"
+	#include "event.h"
+	#include "camera.h"
+	#include "info.h"
+	#include "random.h"
 
-#include <alsa/asoundlib.h>
-#include "audio.h"
-#include "audio.c"
+Arena *main_arena;
+Thread *main_thread;
+Mutex thread_table_mutex;
+u32 max_thread_count = 1024;
+u64 physical_thread_count = 1;
+Thread **thread_table;
+u64 epoch_time_ns;
 
-#include "window.h"
+// SURFACE
+	#include "window.h"
+
+// GRAPHICS
 #include "vk_instance.h"
 #include "vk_device.h"
 #include "vk_command.h"
@@ -47,14 +58,20 @@
 #include "vk_descriptor.h"
 #include "vk_rasterize.h"
 #include "vk_pipeline.h"
-#include "camera.h"
 #include "vk_font.h"
 #include "vk_vertex_buffer.h"
 #include "vk_draw.h"
-#include "pile.h"
 #include "vk_query.h"
-#include "graphics.h"
+#include "ui.h"
 
+// AUDIO 
+#include <alsa/asoundlib.h>
+#include "audio.h"
+
+// PILE
+#include "pile.h"
+
+// GRAPHICS
 #include "vk_instance.c"
 #include "vk_device.c"
 #include "vk_command.c"
@@ -68,22 +85,14 @@
 #include "vk_barrier.c"
 #include "vk_rasterize.c"
 #include "camera.c"
-#include "random.c"
 #include "vk_vertex_buffer.c"
 #include "vk_font.c"
 #include "vk_descriptor.c"
 #include "vk_draw.c"
 #include "vk_query.c"
-#include "graphics.c"
+#include "ui.c"
 
-Arena *main_arena;
-Thread *main_thread;
-Mutex thread_table_mutex;
-u32 max_thread_count = 1024;
-u64 physical_thread_count = 1;
-Thread **thread_table;
-u64 epoch_time_ns;
-
+// BASE
 #include "vector.c"
 #include "string.c"
 #include "process.c"
@@ -95,7 +104,13 @@ u64 epoch_time_ns;
 #include "print.c"
 #include "window.c"
 #include "collatz.c"
+#include "random.c"
 
+// AUDIO 
+#include "audio.c"
+
+// PILE
+#include "pile.c"
 
 void init(void)
 {
@@ -126,18 +141,8 @@ void cleanup(void)
 s32 main(void)
 {
 	init();
-	if(0)
-	{
-		Graphics g = {0};
-		g = stage_graphics(main_arena, g, 0);
-		return 0;
-	}
+	test_pile();
 	AudioDevice *audio_device = create_audio_device(main_arena);
-
-	if(0){
-
-
-	}
 
 	tidings.startup_time = mark_time();
 	Window *window = create_window(main_arena);
@@ -298,6 +303,7 @@ s32 main(void)
 	b32 just_resized = false;
 	PolledEvents pe = {0};
 	u64 vertex_data_size = 0;
+	UIContext *ui_context = initialize_ui_context(main_arena);
 	while(true)
 	{
 		frame_end_time = get_epoch_ns();
@@ -327,6 +333,16 @@ s32 main(void)
 		if(pe.escape.pressed)
 			break;
 		fixed_camera = create_fixed_camera(window->size);
+
+		ui_context_next_frame(ui_context, frame_arena, fixed_camera, pe);
+		{
+			UIElement *e;
+			for(u32 i = 0; i < 100 ;i++)
+			{
+				e = ui_element(0, (String8){0});
+				print("%s\n", e->name);
+			}
+		}
 
 
 		u32 image_index = 0;
@@ -385,6 +401,11 @@ s32 main(void)
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
+			if(0){
+				f32x2 points[] = {{0.0, 0.0},{1.0, 1.0}};
+				f32 radius = 0.1;
+				draw_rounded_rectangle(vb, perfect_rounding(camera, radius), radius, points, 0, f32x4_color_white);
+			}
 			RomuQuad rq = romu_quad_seed(0);
 			f32 radius = 0.9;
 			for(u32 i = 0; i < 1000; i++)
@@ -396,7 +417,6 @@ s32 main(void)
 					try_count++;
 					p = romu_quad_f32x2(&rq);
 				}while(f32x2_length(p) > radius + r);
-				s32 n = 32;
 				f32 left = camera.top_left.x;
 				f32 top = camera.top_left.y;
 				f32 right = camera.bottom_right.x;
@@ -409,7 +429,7 @@ s32 main(void)
 					continue;
 				if(p.y - r > bottom)
 					continue;
-				draw_circle(vb, Max(n, 5), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.0));
+				draw_circle(vb, perfect_circle(camera, r), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.0));
 			}
 			
 			u64 triangle_count = 0;
@@ -496,7 +516,7 @@ s32 main(void)
 				}
 				{
 					f64 rate = ((f64)vertex_data_size / (f64)GiB(1)) / ((f64)draw_time / 1000000000.0);
-					str = str8_print(scratch.arena, "Transfer Rate = %f64 GiB/s\n", rate);
+					str = str8_print(scratch.arena, "Transfer Rate = %f64 GiB/s\nSize to Transfer = %u64 KiB\n", rate, vertex_data_size / KiB(1));
 					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 				}
 				regress_scratch(scratch);
@@ -584,8 +604,7 @@ s32 main(void)
 					f32m3p mp = f32m3_padding(fixed_camera.affine);
 					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 
-					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay"));
-					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay")); cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, overlay_vertex_buffers[frame_index]);
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					cmd_end_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay"));

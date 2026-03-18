@@ -4,7 +4,7 @@ String8 str8_alloc(Arena *arena, u64 len)
 {
 	String8 str = {
 		.len = len,
-		.data = arena_push(arena, 0, len),
+		.data = arena_push(arena, 0, len+1),
 	};
 	return str;
 }

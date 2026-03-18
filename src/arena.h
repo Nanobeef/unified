@@ -38,6 +38,7 @@ typedef struct{
 }Array;
 
 #define allocate_array( ARENA , TYPE , COUNT ) (TYPE*)allocate_array_stride((ARENA), sizeof(TYPE), (COUNT))
+#define zero_array(ARRAY, TYPE) memset(ARRAY, 0, sizeof(TYPE) * TOTAL(ARRAY))
 #define inherit_array( ARENA , TYPE ) (TYPE*)allocate_array_stride((ARENA), sizeof(TYPE), ((ARENA)->size - sizeof(Array)) / sizeof(TYPE))
 
 #define append_array( ARENA, TYPE, PTR_PTR, SRC)\

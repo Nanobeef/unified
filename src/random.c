@@ -17,6 +17,19 @@ u64 splitmix(u64 s)
     return x;
 }
 
+u64 hash_str8(String8 s)
+{
+	u64 v = 0;
+	u32 j = 0;
+	for(u32 i = 0; i < s.len; i++)
+	{
+		u64 c = s.data[i];
+		v = v ^ (c << ((i & 7) << 3));
+	}
+	v = splitmix(v);
+	return v;
+}
+
 RomuQuad romu_quad_seed(u64 seed)
 {
 	RomuQuad rq = {0};
@@ -116,4 +129,21 @@ f32x4 romu_quad_solid_color(RomuQuad *rq)
 	f32x4 c = romu_quad_color(rq);
 	c.a = 1.0;
 	return c;
+}
+
+String8 romu_quad_str8(Arena *arena, RomuQuad *rq, u64 len)
+{
+	static const char *map = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789FF";
+	String8 str = str8_alloc(arena, len);
+	u64 d = 0;
+	for(u32 i = 0; i < len; i++)
+	{
+		if((i & 8) == 0)
+			d = romu_quad(rq);
+		u8 c = d >> (i << 3);
+		c &= 63;
+		str.data[i] = map[c];
+	}
+	str.data[len] = 0;
+	return str;
 }
