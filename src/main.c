@@ -9,6 +9,7 @@
 #include "file.h"
 #include "event.h"
 #include "info.h"
+#include "random.h"
 
 #include <dirent.h>
 #include <sys/stat.h>
@@ -27,6 +28,9 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include <alsa/asoundlib.h>
+#include "audio.h"
+#include "audio.c"
 
 #include "window.h"
 #include "vk_instance.h"
@@ -44,12 +48,12 @@
 #include "vk_rasterize.h"
 #include "vk_pipeline.h"
 #include "camera.h"
-#include "random.h"
 #include "vk_font.h"
 #include "vk_vertex_buffer.h"
 #include "vk_draw.h"
 #include "pile.h"
 #include "vk_query.h"
+#include "graphics.h"
 
 #include "vk_instance.c"
 #include "vk_device.c"
@@ -70,6 +74,7 @@
 #include "vk_descriptor.c"
 #include "vk_draw.c"
 #include "vk_query.c"
+#include "graphics.c"
 
 Arena *main_arena;
 Thread *main_thread;
@@ -91,7 +96,6 @@ u64 epoch_time_ns;
 #include "window.c"
 #include "collatz.c"
 
-#include <alsa/asoundlib.h>
 
 void init(void)
 {
@@ -122,77 +126,17 @@ void cleanup(void)
 s32 main(void)
 {
 	init();
+	if(0)
+	{
+		Graphics g = {0};
+		g = stage_graphics(main_arena, g, 0);
+		return 0;
+	}
+	AudioDevice *audio_device = create_audio_device(main_arena);
 
 	if(0){
-		snd_pcm_t *pcm;
-		if(snd_pcm_open(&pcm, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0)
-		{
-			print("Failed to open alsa driver\n");
-			goto SOUND_END;
-		}
-
-		u32 sample_rate = 48000;
-		u64 period_size = 256;
-		u64 buffer_size = period_size * 4;
-
-		snd_pcm_hw_params_t *params;
-		snd_pcm_hw_params_alloca(&params);
-		snd_pcm_hw_params_any(pcm, params);
-		snd_pcm_hw_params_set_access(pcm, params, SND_PCM_ACCESS_RW_INTERLEAVED);
-		snd_pcm_hw_params_set_format(pcm, params, SND_PCM_FORMAT_FLOAT_LE);
-		snd_pcm_hw_params_set_channels(pcm, params, 2);
-		snd_pcm_hw_params_set_rate_near(pcm, params, &sample_rate, 0);
-		snd_pcm_hw_params_set_period_size_near(pcm, params, &period_size, 0);
-		snd_pcm_hw_params_set_buffer_size_near(pcm, params, &buffer_size);
-
-		snd_pcm_hw_params(pcm, params);
 
 
-
-
-		f32 duration = 1.0;
-		f32 amplitude = 1.0;
-		u64 total_frames = (u64)(duration * sample_rate);
-		f32 *buffer = arena_push(main_arena, true, total_frames * 2 * sizeof(f32));
-
-		f32 frequency = 440.0;
-		f32 phase = 0.0;	
-		f32 phase_inc = 2.0 * PI2 * frequency / sample_rate;
-
-		for(u64 i = 0; i < total_frames; i++)
-		{
-			f32 sample = sin(phase) * amplitude;
-			f32 s = sample;
-
-			buffer[i * 2 + 0] = s;
-			buffer[i * 2 + 1] = s;
-			phase += phase_inc;
-			if(phase >= 2.0 * PI2) 
-				phase -= 2.0 * PI2;
-		}
-
-		u64 frames_written = 0;
-		while(frames_written < total_frames)
-		{
-			s64 written = snd_pcm_writei(pcm, buffer + frames_written * 2, total_frames - frames_written);
-
-			if(written < 0)
-			{
-				print("fail\n");
-				if(written == -EPIPE)
-					snd_pcm_recover(pcm, written, 0);
-				else
-					break;
-			}
-			else
-			{
-				frames_written += written;
-			}
-
-		}
-		SOUND_END:
-		snd_pcm_drain(pcm);
-		snd_pcm_close(pcm);
 	}
 
 	tidings.startup_time = mark_time();
@@ -377,6 +321,7 @@ s32 main(void)
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
 		reset_arena(frame_arena);
 
+		poll_audio_device(audio_device, event_ring_buffer);
 		poll_window(window, event_ring_buffer);
 		poll_events(frame_arena, event_ring_buffer, &pe);
 		if(pe.escape.pressed)
@@ -442,7 +387,7 @@ s32 main(void)
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
 			RomuQuad rq = romu_quad_seed(0);
 			f32 radius = 0.9;
-			for(u32 i = 0; i < 30000; i++)
+			for(u32 i = 0; i < 1000; i++)
 			{
 				f32x2 p;
 				f32 r = fabs(romu_quad_f32(&rq)) * 0.01 + 0.01;
@@ -744,6 +689,7 @@ s32 main(void)
 	destroy_graphics_surface(surface);
 	destroy_graphics_instance(instance);
 	destroy_window(window);
+	destroy_audio_device(audio_device);
 	tidings.cleanup_time = record_time();
 
 	cleanup();

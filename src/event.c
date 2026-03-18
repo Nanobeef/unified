@@ -101,6 +101,28 @@ u32 poll_events(Arena *arena, Event *event_ring_buffer, PolledEvents *inpe)
 		count++;
 		switch(e.type)
 		{
+			case EVENT_MIDI:{
+				AudioDevice *device = e.audio_device_pointer;	
+				switch(e.midi.type)
+				{
+					case MIDI_KEY:{
+						if(e.midi.key.note < 128)
+						{
+							ButtonEventType action;
+							s32 velocity = e.midi.key.velocity;
+							if(velocity)
+								action = BUTTON_PRESS;
+							else
+								action = BUTTON_RELEASE;
+
+							Button *button = pe.midi_keys + e.midi.key.note;
+							press_button(arena, button, e.time, action);
+						}
+					}break;
+					default:
+					break;
+				}
+			}break;
 			case EVENT_WINDOW:{
 				Window *window = e.window_pointer;
 				if(window == 0)
@@ -262,6 +284,9 @@ u32 poll_events(Arena *arena, Event *event_ring_buffer, PolledEvents *inpe)
 			default:
 			break;
 		}
+			
+			
+			
 	}
 	*inpe = pe;
 	return count;

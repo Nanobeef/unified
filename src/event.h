@@ -5,6 +5,7 @@ typedef enum{
     EVENT_PROCESS,
     EVENT_KEYBOARD,
     EVENT_MOUSE,
+	EVENT_MIDI,
     EVENT_SET_CURSOR,
 }EventTypeFlags;
 typedef u32 EventType;
@@ -69,8 +70,6 @@ typedef struct{
         MouseButtonType button;
     };
 }MouseEvent;
-
-
 
 typedef enum{
     KEY_NONE = 0,
@@ -163,6 +162,20 @@ typedef struct{
     f32x4 foreground_color;
 }CursorSetEvent;
 
+typedef enum{
+	MIDI_KEY,
+}MidiTypeFlags;
+typedef u32 MidiType;
+
+typedef struct{
+	MidiType type;
+	union {
+		struct{
+			s32 channel, note, velocity;
+		}key;
+	};
+}MidiEvent;
+
 typedef struct{
     EventType type;
     union{
@@ -170,8 +183,12 @@ typedef struct{
         KeyboardEvent keyboard;
         MouseEvent mouse;
         CursorSetEvent set_cursor;
+		MidiEvent midi;
     };
-    void *window_pointer;
+	union{
+    	void *window_pointer;
+		void *audio_device_pointer;
+	};
     u64 time;
 }Event;
 
@@ -185,6 +202,7 @@ typedef struct Button{
     u64 press_time;
     u64 release_time;
     u64 action_time;
+	u64 velocity;
 	struct Button *previous;
 }Button;
 
@@ -210,7 +228,7 @@ typedef struct{
    Button first_button;
 	Button a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
 	Button n0,n1,n2,n3,n4,n5,n6,n7,n8,n9;
-	Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
+Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
 	Button left_control, right_control, control;
 	Button left_shift, right_shift, shift;
 	Button left_alt, right_alt, alt;
@@ -223,7 +241,11 @@ typedef struct{
 	Button	middle_mouse;
 	Button  back_mouse;
 	Button  forward_mouse;
+
+
+	Button midi_keys[128];
    Button  last_button;
+
 
 	Wheel	wheel;
 	Mouse	mouse;

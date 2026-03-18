@@ -38,6 +38,7 @@
 #include "f32x4.h"
 #include "f64x2.h"
 
+
 #include "u32x2.c"
 #include "s32x2.c"
 
@@ -50,6 +51,7 @@
 #include "f32m3.h"
 #include "f32m3.c"
 
+#include "f32x16.h"
 
 
 static f32x2 f32x2_cast_u32x2(u32x2 a)

@@ -167,7 +167,7 @@ void destroy_thread(Thread *thread)
 	thread->index = max_thread_count+1;
 
 	wait_for_thread(thread);	
-	begin_thread_work(thread, end_thread_work);
+	begin_thread_work(thread, end_thread_work, NULL);
 	lock_mutex(&thread_table_mutex);
 	for(u32 i = 0; i < max_thread_count; i++)
 	{
@@ -191,22 +191,23 @@ void wait_for_thread(Thread *thread)
 	unlock_mutex(&thread->mutex);
 }
 
-b32 begin_thread_work(Thread *thread, PFN_Thread *function)
+b32 begin_thread_work(Thread *thread, PFN_Thread *function, void *data)
 {
 	lock_mutex(&thread->mutex);
+	atomic_store(&thread->data, data);
 	binary_signal_semaphore(&thread->working_semaphore);
 	atomic_store(&thread->function, (u64)function);
 	unlock_mutex(&thread->mutex);
 	return false;
 }
 
-Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function)
+Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function, void *data)
 {
 	Thread *thread = create_thread(arena, scratch_arena_size, stack_size);
 	if(thread)
 	{
 		wait_for_thread(thread);
-		begin_thread_work(thread, function);
+		begin_thread_work(thread, function, data);
 	}
 	return thread;
 }

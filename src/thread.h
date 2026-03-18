@@ -41,6 +41,8 @@ typedef struct Thread{
 	u64 marked_time;
 	u64 recorded_time;
 
+	atomic void *data;
+
 	Semaphore working_semaphore;
 	Semaphore idling_semaphore;
 	Mutex mutex;
@@ -57,8 +59,8 @@ Thread *allocate_thread(Arena *arena, u64 scratch_arena_size);
 Thread *create_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size);
 void destroy_thread(Thread *thread);
 void wait_for_thread(Thread *thread);
-b32 begin_thread_work(Thread *thread, PFN_Thread *function);
-Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function);
+b32 begin_thread_work(Thread *thread, PFN_Thread *function, void *data);
+Thread *start_thread(Arena *arena, u64 scratch_arena_size, u64 stack_size, PFN_Thread *function, void *data);
 Thread* current_thread(void);
 
 u32 get_physical_thread_count();
