@@ -10,6 +10,13 @@ UIContext *initialize_ui_context(Arena *arena)
 		zero_array(context->name_maps[i], UIElement);
 	}
 	context->root = arena_push(arena, true, sizeof(UIElement));
+	context->root[0] = (UIElement){
+		.child_array = allocate_array(arena, UIElement, 64),		
+		.name = str8_lit("UI"),
+		.bounding_box[0] = f32x2_set(0,0),
+		.bounding_box[1] = f32x2_set(1024, 1024),
+	};
+
 	current_thread()->ui_data = context;
 	return context;
 }
@@ -20,25 +27,32 @@ void ui_context_next_frame(UIContext *context, Arena *frame_arena, FixedCamera f
 	context->fixed = fixed;
 	context->pe = pe;
 	context->frame_accum++;
+	context->root->bounding_box[1] = f32x2_cast_u32x2(fixed.pixel_size);
 	current_thread()->ui_data = context;
 }
 
-String8 generate_ui_element_name(Arena *arena, u64 *seed)
+String8 generate_ui_element_name(Arena *arena, String8 original_name, u64 *seed)
 {
-	RomuQuad rq = romu_quad_seed(*seed);	
-	String8 name = romu_quad_str8(arena, &rq, 4);
-	seed[0]++;
-	return name;
+	if(original_name.len)
+	{
+	}
+	else
+	{
+		RomuQuad rq = romu_quad_seed(*seed);	
+		String8 name = romu_quad_str8(arena, &rq, 4);
+		seed[0]++;
+		return name;
+	}
 }
-
 
 UIElement* ui_element(UIElement *parent, String8 name)
 {
+	String8 original_name = name;
 	UIContext *context = current_thread()->ui_data;
 	if(parent == 0)
 		parent = context->root;	
-	if(name.len == 0)
-		name = generate_ui_element_name(context->frame_arena, &parent->random_seed);
+
+	name = generate_ui_element_name(context->frame_arena, (String8){0}, &parent->random_seed);
 
 	UIElement *name_map = context->name_maps[context->frame_accum & 1];
 
@@ -57,7 +71,7 @@ TABLE_INSERT:
 			{
 				if(str8_equal(name, name_map[slot_index].name))
 				{
-					name = generate_ui_element_name(context->frame_arena, &parent->random_seed);
+					name = generate_ui_element_name(context->frame_arena, original_name, &parent->random_seed);
 					goto TABLE_INSERT;
 				}
 			}

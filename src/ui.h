@@ -5,7 +5,6 @@ typedef struct{
 	
 }UITheme;
 
-
 typedef struct UIElement{
 	struct UIElement *parent;
 	struct UIElement *child_array;

@@ -340,7 +340,6 @@ s32 main(void)
 			for(u32 i = 0; i < 100 ;i++)
 			{
 				e = ui_element(0, (String8){0});
-				print("%s\n", e->name);
 			}
 		}
 
