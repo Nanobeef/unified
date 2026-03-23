@@ -11,10 +11,10 @@ UIContext *initialize_ui_context(Arena *arena)
 	}
 	context->root = arena_push(arena, true, sizeof(UIElement));
 	context->root[0] = (UIElement){
-		.child_array = allocate_array(arena, UIElement, 64),		
+		.child_array = allocate_array(arena, UIElement*, 64),		
 		.name = str8_lit("UI"),
-		.bounding_box[0] = f32x2_set(0,0),
-		.bounding_box[1] = f32x2_set(1024, 1024),
+		.fixed_position = f32x2_set(0,0),
+		.fixed_size = f32x2_set(1024, 1024),
 	};
 
 	current_thread()->ui_data = context;
@@ -24,25 +24,26 @@ UIContext *initialize_ui_context(Arena *arena)
 void ui_context_next_frame(UIContext *context, Arena *frame_arena, FixedCamera fixed, PolledEvents pe)
 {
 	context->frame_arena = frame_arena;	
+	context->root->random_seed = 1234567890;
 	context->fixed = fixed;
 	context->pe = pe;
 	context->frame_accum++;
-	context->root->bounding_box[1] = f32x2_cast_u32x2(fixed.pixel_size);
+	context->root->fixed_size = f32x2_cast_u32x2(fixed.pixel_size);
+	context->root->child_array = 0;
 	current_thread()->ui_data = context;
 }
 
 String8 generate_ui_element_name(Arena *arena, String8 original_name, u64 *seed)
 {
+	RomuQuad rq = romu_quad_seed(*seed);	
+	String8 name = romu_quad_str8(arena, &rq, 4);
+	seed[0]++;
 	if(original_name.len)
 	{
+		String8 strings[2] = {original_name, name};
+		name = str8_concatenate_and_seperate(arena, 2, strings, str8_lit(":"));
 	}
-	else
-	{
-		RomuQuad rq = romu_quad_seed(*seed);	
-		String8 name = romu_quad_str8(arena, &rq, 4);
-		seed[0]++;
-		return name;
-	}
+	return name;
 }
 
 UIElement* ui_element(UIElement *parent, String8 name)
@@ -102,13 +103,26 @@ SLOT_FOUND:
 	if(is_empty_slot)
 	{
 		memset(name_map + slot_index, 0, sizeof(UIElement));
-		slot->name = name;
 	}
 	else
 	{
 		memcpy(name_map + slot_index, slot, sizeof(UIElement));
 		memset(slot, 0, sizeof(UIElement));
 	}
+	slot = name_map + slot_index;
+
+	slot->name = name;
+	slot->parent = parent;
+	slot->child_array = 0;
 	slot->frame_accum = context->frame_accum;
+	slot->fixed_position = parent->fixed_position;
+	slot->fixed_size = parent->fixed_size;
+
+	if(slot->parent->child_array == 0)
+	{
+		slot->parent->child_array = allocate_array(context->frame_arena, UIElement*, 16);	
+	}
+	append_array(context->frame_arena, UIElement*, &slot->parent->child_array, slot);
+
 	return slot;
 }

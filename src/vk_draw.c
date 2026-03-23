@@ -272,19 +272,20 @@ f32x2 ellipse_make_next(EllipseMaker *m);
 
 u32 perfect_rounding(Camera camera, f32 radius)
 {
-	u32 quality = radius / camera.unit_pixel.x;
-	quality = Max(quality, 4);
+	f32 quality = radius / camera.unit_pixel.x;
 	quality = Min(quality, camera.pixel_size.x);
-	return quality;
+	quality *= 0.5;
+	quality = Max(quality, 4);
+	return (u32)quality;
 }
 
 u32 perfect_circle(Camera camera, f32 radius)
 {
-	u32 quality = radius / camera.unit_pixel.x;
-	quality = Max(quality, 1);
+	f32 quality = radius / camera.unit_pixel.x;
 	quality = Min(quality, camera.pixel_size.x);
-	quality *= 4;
-	return quality;
+	quality *= 2;
+	quality = Max(quality, 4);
+	return (u32)quality;
 }
 
 

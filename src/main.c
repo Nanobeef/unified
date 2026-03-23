@@ -280,8 +280,6 @@ s32 main(void)
 
 	}
 
-
-	
 	arena_push_type(main_arena, false, frame_count, GraphicsQueryPool, timestamp_query_pools);
 	arena_push_type(main_arena, false, frame_count, GraphicsQueryPool, invocation_query_pools);
 	for(u32 i = 0; i < frame_count; i++)
@@ -309,14 +307,16 @@ s32 main(void)
 		frame_end_time = get_epoch_ns();
 		tidings.frame_elapsed_time = frame_end_time - frame_start_time;
 		tidings.frame_sleep_time = mark_time();
-		u64 frame_sleep_time = 0;
-		if(tidings.frame_elapsed_time < tidings.desired_frame_time  && (swapchain.create_info.presentMode == VK_PRESENT_MODE_FIFO_KHR))
+		if(pe.a.pressed)
 		{
-			frame_sleep_time = tidings.desired_frame_time - tidings.frame_elapsed_time;
+			u64 frame_sleep_time = 0;
+			if(tidings.frame_elapsed_time < tidings.desired_frame_time  && (swapchain.create_info.presentMode == VK_PRESENT_MODE_FIFO_KHR))
+			{
+				frame_sleep_time = tidings.desired_frame_time - tidings.frame_elapsed_time;
 
-
-			u64 us = frame_sleep_time / 1000;
-			usleep(us);
+				u64 us = frame_sleep_time / 1000;
+				usleep(us);
+			}
 		}
 
 		frame_start_time = end_time(&tidings.frame_sleep_time);
@@ -340,6 +340,7 @@ s32 main(void)
 			for(u32 i = 0; i < 100 ;i++)
 			{
 				e = ui_element(0, (String8){0});
+				print("%u32, %s\n", i, e->name);
 			}
 		}
 
@@ -407,10 +408,10 @@ s32 main(void)
 			}
 			RomuQuad rq = romu_quad_seed(0);
 			f32 radius = 0.9;
-			for(u32 i = 0; i < 1000; i++)
+			for(u32 i = 0; i < 10; i++)
 			{
 				f32x2 p;
-				f32 r = fabs(romu_quad_f32(&rq)) * 0.01 + 0.01;
+				f32 r = fabs(romu_quad_f32(&rq)) * 1 + 0.01;
 				u32 try_count = 0;
 				do{
 					try_count++;
@@ -428,7 +429,7 @@ s32 main(void)
 					continue;
 				if(p.y - r > bottom)
 					continue;
-				draw_circle(vb, perfect_circle(camera, r), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.0));
+				draw_circle(vb, perfect_circle(camera, r), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.5));
 			}
 			
 			u64 triangle_count = 0;

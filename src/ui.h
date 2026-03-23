@@ -1,20 +1,41 @@
 
 
 
-typedef struct{
-	
-}UITheme;
+typedef enum{
+	UI_ELEMENT_BOX,
+	UI_ELEMENT_BUTTON,
+	UI_ELEMENT_SLIDER,
+	UI_ELEMENT_
+}UIElementType;
 
 typedef struct UIElement{
 	struct UIElement *parent;
-	struct UIElement *child_array;
+	struct UIElement **child_array;
 
 	u64 frame_accum;
 	u64 random_seed;
 
 	String8 name;
 
-	f32x2 bounding_box[2];
+
+	f32x2 fixed_position;
+	f32x2 fixed_size;
+	f32x2 min_size;
+
+
+	b32 active;
+	b32 disabled;
+	b32 focused;
+
+	f32x4 background_color;
+	f32x4 border_color;
+	f32x4 text_color;
+
+	
+	
+
+
+
 
 }UIElement;
 
