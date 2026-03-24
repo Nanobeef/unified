@@ -491,8 +491,18 @@ s32 main(void)
 				f32x2 pen = f32x2_set(1,0);
 				pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 
+				u64 cb_time = 0;
 				{
 					TimestampQueryResult *results = get_graphics_timestamp_query_pool_results(scratch.arena, timestamp_query_pools[last_frame_index]);
+					{
+						for(u32 i = 0; i < USED(results); i++)
+						{
+							if(str8_equal(results[i].name, str8_lit("Buffer")))
+							{
+								cb_time = results[i].elapsed;
+							}
+						}
+					}
 					str = str8_print(scratch.arena, "Queue:\n");
 					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 					for(u32 i = 0; i < USED(results); i++)
@@ -515,7 +525,7 @@ s32 main(void)
 					}
 				}
 				{
-					f64 rate = ((f64)vertex_data_size / (f64)GiB(1)) / ((f64)draw_time / 1000000000.0);
+					f64 rate = ((f64)vertex_data_size / (f64)GiB(1)) / ((f64)cb_time / 1000000000.0);
 					str = str8_print(scratch.arena, "Transfer Rate = %f64 GiB/s\nSize to Transfer = %u64 KiB\n", rate, vertex_data_size / KiB(1));
 					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 				}
