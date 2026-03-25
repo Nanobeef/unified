@@ -30,6 +30,7 @@ void ui_context_next_frame(UIContext *context, Arena *frame_arena, FixedCamera f
 	context->frame_accum++;
 	context->root->fixed_size = f32x2_cast_u32x2(fixed.pixel_size);
 	context->root->child_array = 0;
+	context->root->name = str8_lit("Root");
 	current_thread()->ui_data = context;
 }
 
@@ -48,18 +49,25 @@ String8 generate_ui_element_name(Arena *arena, String8 original_name, u64 *seed)
 
 UIElement* ui_element(UIElement *parent, String8 name)
 {
-	String8 original_name = name;
 	UIContext *context = current_thread()->ui_data;
 	if(parent == 0)
 		parent = context->root;	
 
 	name = generate_ui_element_name(context->frame_arena, (String8){0}, &parent->random_seed);
 
+	{
+		String8 strs[] = {parent->name, name};
+		name = str8_concatenate_and_seperate(context->frame_arena, 2, strs, str8_lit("/"));
+	}
+
+	String8 original_name = name;
+
+
+
 	UIElement *name_map = context->name_maps[context->frame_accum & 1];
 
 TABLE_INSERT:
-	UIElement *slot = 0;
-	u64 slot_index;
+	UIElement *slot = 0; u64 slot_index;
 	b32 is_empty_slot = false;
 	u64 hash_index = hash_str8(name) % TOTAL(name_map);
 	u64 lookup_ranges[4] = {hash_index, TOTAL(name_map), 0, hash_index};
@@ -125,4 +133,51 @@ SLOT_FOUND:
 	append_array(context->frame_arena, UIElement*, &slot->parent->child_array, slot);
 
 	return slot;
+}
+
+UIElement **create_all_child_element_array(Arena *arena, UIElement* e)
+{
+	u32 count = 0;
+	u32 a = 0;
+	u32 b = 1;
+	UIElement **all_child_array = allocate_array(arena, UIElement*, 16);
+	append_array(arena, UIElement*, &all_child_array, e);
+	while(a < b)
+	{
+		u32 bb = b;
+		for(u32 j = a; j < b; j++)
+		{
+			UIElement **current_child_array = all_child_array[j]->child_array;
+			if(current_child_array)
+			{
+				u32 used = USED(current_child_array);
+				for(u32 i = 0; i < used; i++)
+				{
+					append_array(arena, UIElement*, &all_child_array, current_child_array[i]);
+				}
+				bb += used;
+			}
+		}
+		a = b + 1;
+		b = bb;
+	}
+	return all_child_array;
+}
+
+void draw_ui_element(UIElement *e)
+{
+	Scratch scratch = find_scratch(0,0,0);
+	UIElement **all_child_array = create_all_child_element_array(scratch.arena, e);
+	for(u32 i = 0; i < USED(all_child_array); i++)
+	{
+		UIElement *e = all_child_array[i];
+		print("%s\n", e->name);
+	}
+	
+	regress_scratch(scratch);
+}
+
+void poll_ui_element(UIElement *e)
+{
+
 }

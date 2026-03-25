@@ -335,14 +335,26 @@ s32 main(void)
 		fixed_camera = create_fixed_camera(window->size);
 
 		ui_context_next_frame(ui_context, frame_arena, fixed_camera, pe);
-		{
+		if(frame_accum == 1){
 			UIElement *e;
-			for(u32 i = 0; i < 100 ;i++)
+			RomuQuad rq = romu_quad_seed(24);
+			for(u32 i = 0; i < 5 ;i++)
 			{
 				e = ui_element(0, (String8){0});
-				print("%u32, %s\n", i, e->name);
+				UIElement **child_array = create_all_child_element_array(frame_arena, ui_context->root);
+				for(u32 j = 0; j < USED(child_array); j++)
+				{
+					u64 r = romu_quad(&rq);
+					if(r % 2 == 0)
+					{
+						ui_element(child_array[j], (String8){0});	
+					}
+				}
 			}
+
+			draw_ui_element(ui_context->root);
 		}
+
 
 
 		u32 image_index = 0;

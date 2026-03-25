@@ -15,13 +15,13 @@ typedef struct UIElement{
 	u64 frame_accum;
 	u64 random_seed;
 
+	String8 local_name;
 	String8 name;
 
 
 	f32x2 fixed_position;
 	f32x2 fixed_size;
 	f32x2 min_size;
-
 
 	b32 active;
 	b32 disabled;
@@ -30,13 +30,6 @@ typedef struct UIElement{
 	f32x4 background_color;
 	f32x4 border_color;
 	f32x4 text_color;
-
-	
-	
-
-
-
-
 }UIElement;
 
 typedef struct{
