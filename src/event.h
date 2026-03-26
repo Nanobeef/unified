@@ -228,7 +228,7 @@ typedef struct{
    Button first_button;
 	Button a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z;
 	Button n0,n1,n2,n3,n4,n5,n6,n7,n8,n9;
-Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
+	Button f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12;
 	Button left_control, right_control, control;
 	Button left_shift, right_shift, shift;
 	Button left_alt, right_alt, alt;

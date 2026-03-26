@@ -21,7 +21,6 @@ Camera init_camera(void)
 		.transition = false,
 	};
 
-
 	return camera;
 }
 
@@ -176,4 +175,19 @@ FixedCamera create_fixed_camera(u32x2 pixel_size)
 	camera.affine = f32m3_affine_scale(aspect, 1.0);
 
 	return camera;
+}
+
+f32x2 fixed_camera_pixels(FixedCamera camera, f32x2 in)
+{
+	f32x2 out = in;
+	out = f32x2_mul(out, camera.unit_pixel);
+	out = f32x2_add(out, camera.top_left);
+	return out;
+}
+
+f32 fixed_camera_pixels1(FixedCamera camera, f32 in)
+{
+	f32 out = in;
+	out = out * camera.unit_pixel.x;
+	return out;
 }

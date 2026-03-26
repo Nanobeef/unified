@@ -91,6 +91,17 @@ static u32 popcount(u64 a)
 	return c;
 }
 
+static u32 most_significant_bit_position(u64 a)
+{
+	u32 c = 0;
+	while(a)
+	{
+		a>>=1;
+		c++;
+	}
+	return c-1;
+}
+
 #define Align( x ) (__attribute__((aligned(x))))
 
 
@@ -154,6 +165,8 @@ static u32 popcount(u64 a)
 #if __SIZEOF_POINTER__ != 8
 	#error This program only supports 64-bit machines.
 #endif
+
+
 
 
 

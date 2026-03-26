@@ -126,13 +126,24 @@ void *audio_thread(Thread *thread)
 }
 
 
+void silent_snd_error_handler(const char *file, s32 line, const char* function, s32 error, const char *fmt, ...)
+{
+	// Do nothing.
+	return;
+}
+
 AudioDevice* create_audio_device(Arena *arena)
 {
+
+
+	snd_lib_error_set_handler(silent_snd_error_handler);
+
+
 	snd_seq_t *seq = 0;
 	snd_seq_open(&seq, "default", SND_SEQ_OPEN_INPUT, 0);
 	if(seq == 0)
 	{
-		print("Failed to create ALSA sequencer.\n");
+		//print("Failed to create ALSA sequencer.\n");
 		return 0;
 	}
 
@@ -179,7 +190,7 @@ AudioDevice* create_audio_device(Arena *arena)
 	snd_pcm_t *pcm;
 	if(snd_pcm_open(&pcm, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0)
 	{
-		print("Failed to open alsa driver\n");
+		//print("Failed to open alsa driver\n");
 		return 0;
 	}
 

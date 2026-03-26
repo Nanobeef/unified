@@ -131,6 +131,12 @@ f32x2 draw_str8_cutoff_relaxed(GraphicsDeviceVertexBuffer *vb, FixedCamera camer
 	return pen;
 }
 
+
+f32x2 draw_str8_culled_box(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, String8 str, f32x2 pen, f32 pt, Str8DrawInfo info, f32x4 color)
+{
+	return pen;		
+}
+
 void draw_solid_triangle(GraphicsDeviceVertexBuffer *vb, f32x2 p[3], f32x4 color)
 {
 	Vertex2 v[3];
@@ -200,10 +206,77 @@ void draw_quad(GraphicsDeviceVertexBuffer *vb, f32x2 p[4], f32x2 t[4], f32x4 c[4
 			v[i].texture = t[i];
 		else
 			v[i].texture = f32x2_set1(0.0f);
-
 	}
 	u32 indices[6] = {0,1,2,2,3,0};
-	graphics_device_vertex_buffer_push_indexed(vb, 3, indices, 4, v);
+	graphics_device_vertex_buffer_push_indexed(vb, 6, indices, 4, v);
+}
+
+void draw_rectangle4(GraphicsDeviceVertexBuffer *vb, f32x2 p[2], f32x2 t[2], f32x4 c[4])
+{
+	Vertex2 v[4];
+	v[0].position = p[0];
+	v[1].position = f32x2_set(p[0].x, p[1].y);
+	v[2].position = p[1];
+	v[3].position = f32x2_set(p[1].x, p[0].y);
+	if(t)
+	{
+		v[0].texture = t[0];
+		v[1].texture = f32x2_set(t[0].x, t[1].y);
+		v[2].texture = t[1];
+		v[3].texture = f32x2_set(t[0].y, t[1].x);
+	}
+	else
+	{
+		for(u32 i = 0; i < 4; i++) {v[i].texture = f32x2_set1(0.0f);};
+	}
+	for(u32 i = 0; i < 4; i++)
+	{
+		if(c)
+			v[i].color = c[i];
+		else
+			v[i].color = f32x4_set1(1.0f);
+	}
+	u32 indices[6] = {0,1,2,2,3,0};
+	graphics_device_vertex_buffer_push_indexed(vb, 6, indices, 4, v);
+}
+
+void draw_rectangle(GraphicsDeviceVertexBuffer *vb, f32x2 p[2], f32x2 t[2], f32x4 c)
+{
+	f32x4 cols[] = {c,c,c,c};
+	draw_rectangle4(vb, p,t,cols);
+}
+
+void draw_rectangle_outline(GraphicsDeviceVertexBuffer *vb, f32 thickness, f32x2 p[2], f32x4 c)
+{
+	Vertex2 v[8];
+	for(u32 i = 0; i < 4; i++)
+	{
+		v[i].texture = f32x2_set1(0.0f);
+		v[i].color = c;
+	}
+	v[0].position = p[0];
+	v[1].position = f32x2_set(p[0].x, p[1].y);
+	v[2].position = p[1];
+	v[3].position = f32x2_set(p[1].x, p[0].y);
+	v[4] = v[0];
+	v[5] = v[1];
+	v[6] = v[2];
+	v[7] = v[3];
+
+	thickness = -thickness;
+
+	v[4].position = f32x2_add(v[4].position, f32x2_set(thickness, thickness));
+	v[5].position = f32x2_add(v[5].position, f32x2_set( thickness, -thickness));
+	v[6].position = f32x2_add(v[6].position, f32x2_set( -thickness,  -thickness));
+	v[7].position = f32x2_add(v[7].position, f32x2_set( -thickness, thickness));
+
+	static u32 indices[] = {
+		0,1,4, 1,5,4,
+		1,2,5, 2,6,5,
+		2,3,6, 3,7,6,
+		3,0,7, 0,4,7,
+	};
+	graphics_device_vertex_buffer_push_indexed(vb, 24, indices, 8, v);
 }
 
 void draw_circle(GraphicsDeviceVertexBuffer *vb, u32 n, f32x2 p, f32 pr, f32x2 t, f32 tr, f32x4 inner_color, f32x4 outer_color)
@@ -347,6 +420,12 @@ void draw_rounded_rectangle(GraphicsDeviceVertexBuffer *vb, u32 quality, f32 rad
 		return;
 	if(t)
 		print("Texture parameter is unused.\n");
+	
+	if(radius == 0.0f)
+	{
+		draw_rectangle(vb, p, t, color);
+		return;
+	}
 
 	f32x2 ta, tb;;
 	ta.x = fmin(p[0].x,p[1].x);
@@ -392,6 +471,14 @@ void draw_rounded_rectangle_outline(GraphicsDeviceVertexBuffer *vb, u32 quality,
 		return;
 	if(t)
 		print("Texture parameter is unused.\n");
+	
+	if(radius == 0.0f)
+	{
+		draw_rectangle_outline(vb, thickness, p, color);
+		return;
+	}
+
+		
 
 	f32x2 ta, tb;;
 	ta.x = fmin(p[0].x,p[1].x);
@@ -437,4 +524,5 @@ void draw_rounded_rectangle_outline(GraphicsDeviceVertexBuffer *vb, u32 quality,
 	graphics_device_vertex_buffer_push_indexed(vb, index_count, indices, point_count, points);
 	regress_scratch(scratch);
 }
+
 

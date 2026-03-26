@@ -27,6 +27,13 @@ char *cstr_str8(Arena *arena, String8 str)
 	return cstr;
 }
 
+String8 str8_copy(Arena *arena, String8 s)
+{
+	String8 str = str8_alloc(arena, s.len);
+	memcpy(str.data, s.data, s.len+1);
+	return str;
+}
+
 String8 str8_concatenate(Arena *arena, u32 count, const String8 *strings)
 {
 	u64 total_len = 0;

@@ -301,7 +301,7 @@ s32 main(void)
 	b32 just_resized = false;
 	PolledEvents pe = {0};
 	u64 vertex_data_size = 0;
-	UIContext *ui_context = initialize_ui_context(main_arena, font_cache);
+	UIContext *ui_context = initialize_ui_context(main_arena);
 	while(true)
 	{
 		frame_end_time = get_epoch_ns();
@@ -335,14 +335,10 @@ s32 main(void)
 		fixed_camera = create_fixed_camera(window->size);
 
 		ui_context_next_frame(ui_context, frame_arena, fixed_camera);
-		if(sample_count)
-			ui_context->pixel_granularity = 1.0f / (f32)(most_significant_bit_position(sample_count) + 1);
 		{
 			ui_test();
 			poll_ui(pe);
 		}
-
-
 
 		u32 image_index = 0;
 		GraphicsDeviceImage swapchain_image = swapchain.images[image_index];
@@ -400,12 +396,17 @@ s32 main(void)
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
+			if(0){
+				f32x2 points[] = {{0.0, 0.0},{1.0, 1.0}};
+				f32 radius = 0.1;
+				draw_rounded_rectangle(vb, perfect_rounding(camera, radius), radius, points, 0, f32x4_color_white);
+			}
 			RomuQuad rq = romu_quad_seed(0);
 			f32 radius = 0.9;
-			for(u32 i = 0; i < 100; i++)
+			for(u32 i = 0; i < 10; i++)
 			{
 				f32x2 p;
-				f32 r = fabs(romu_quad_f32(&rq)) * 0.05 + 0.05;
+				f32 r = fabs(romu_quad_f32(&rq)) * 1 + 0.01;
 				u32 try_count = 0;
 				do{
 					try_count++;
@@ -423,18 +424,7 @@ s32 main(void)
 					continue;
 				if(p.y - r > bottom)
 					continue;
-				draw_circle(vb, perfect_circle(camera, r), p, r, f32x2_set1(0.0), 0.0, f32x4_set(1.0, 0.0, 0.0, 1.0), f32x4_set(0.5, 0.0, 0.0, 0.0));
-			}
-
-			{
-				f32x2 p[] = {{-0.5, -0.5},{0.5, 0.5}};
-				f32 r = 0.1;
-				if(pe.a.pressed)
-					r = 0.0f;
-					u32 q = 10;
-					draw_rounded_rectangle_outline(vb, q, r, 0.1, p, 0, f32x4_set(1.0, 0.0, 1.0, 0.1));
-					draw_rounded_rectangle_outline(vb, q, r, 0.001, p, 0, f32x4_set(1.0, 1.0, 1.0, 0.9));
-					draw_rounded_rectangle(vb, q, r, p, 0, f32x4_set(0.0, 0.0, 1.0, 0.1));
+				draw_circle(vb, perfect_circle(camera, r), p, r, f32x2_set1(0.0), 0.0, f32x4_set1(1.0), f32x4_set1(0.5));
 			}
 			
 			u64 triangle_count = 0;
@@ -483,19 +473,18 @@ s32 main(void)
 		tidings.font_resolve_time = record_time();
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
 		{
-			f32 text_pt = 10;
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(overlay_vertex_buffers + frame_index, font_cache, frame_arena);
-			draw_ui(vb);
 			u64 draw_time = 0;
 			{
 				String8 str;
 				Scratch scratch = find_scratch(0,0,0);
 				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
-				"Frame  \t%tus (%u32 fps)\n Desired \t%tus\n Elapsed \t%tus (%u32)\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
+				"Frame  \t%tus\n Desired \t%tus\n Elapsed \t%tus\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
 				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
-				tidings.frame_time, (u32)(f32)(1.0 / ((f64)tidings.frame_time / (f64)1000000000)), tidings.desired_frame_time, tidings.frame_elapsed_time, (u32)(((f32)tidings.frame_elapsed_time / (f32)tidings.desired_frame_time) * 100.0), tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, tidings.cb_wait_time, tidings.cb_record_time);
+				tidings.frame_time, tidings.desired_frame_time, tidings.frame_elapsed_time, tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, 
+				tidings.cb_wait_time, tidings.cb_record_time);
 				f32x2 pen = f32x2_set(1,0);
-				pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
+				pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 
 				u64 cb_time = 0;
 				{
@@ -510,11 +499,11 @@ s32 main(void)
 						}
 					}
 					str = str8_print(scratch.arena, "Queue:\n");
-					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
+					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 					for(u32 i = 0; i < USED(results); i++)
 					{
 						str = str8_print(scratch.arena, " %s \t%tus\n",results[i].name, results[i].elapsed);
-						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
+						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 						if(str8_equal(results[i].name, str8_lit("Draw World")))
 							draw_time += results[i].elapsed;
 						else if(str8_equal(results[i].name, str8_lit("Draw Overlay")))
@@ -527,17 +516,18 @@ s32 main(void)
 					for(u32 i = 0; i < USED(results); i++)
 					{
 						str = str8_print(scratch.arena, "%s = %u64\n", results[i].name, results[i].count);
-						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
+						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 					}
 				}
 				{
 					f64 rate = ((f64)vertex_data_size / (f64)GiB(1)) / ((f64)cb_time / 1000000000.0);
 					str = str8_print(scratch.arena, "Transfer Rate = %f64 GiB/s\nSize to Transfer = %u64 KiB\n", rate, vertex_data_size / KiB(1));
-					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
+					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, 16, f32x4_color_ao);
 				}
 				regress_scratch(scratch);
 			}
 
+			draw_ui(vb);
 
 			end_graphics_device_vertex_buffer(vb);
 		}

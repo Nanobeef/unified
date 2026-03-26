@@ -8,6 +8,7 @@ typedef struct String8{
 
 String8 str8_alloc(Arena *arena, u64 len);
 String8 str8_cstr(Arena *arena, const char *src);
+String8 str8_copy(Arena *arena, String8 s);
 
 char *cstr_str8(Arena *arena, String8 str);
 

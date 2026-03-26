@@ -16,6 +16,8 @@ typedef struct{
 }FixedCamera;
 
 FixedCamera create_fixed_camera(u32x2 pixel_size);
+f32x2 fixed_camera_pixels(FixedCamera camera, f32x2 in);
+f32 fixed_camera_pixels1(FixedCamera camera, f32 in);
 
 typedef struct{
 	f32m3 src_affine;

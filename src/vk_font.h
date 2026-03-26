@@ -20,7 +20,6 @@ typedef struct{
 	f32x2 dpi;
 }GraphicsDeviceFont;
 
-
 typedef struct{
 	u32 code;
 	f32 pt;
@@ -60,7 +59,6 @@ typedef struct GraphicsDeviceFontCache{
 	GraphicsDeviceGlyph *glyph_map;
 
 	GraphicsDeviceGlyph **new_glyph_array;
-	
 
 	u32x2 size;
 	u32x2 position;
