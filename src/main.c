@@ -141,7 +141,6 @@ void cleanup(void)
 s32 main(void)
 {
 	init();
-	test_pile();
 	AudioDevice *audio_device = create_audio_device(main_arena);
 
 	tidings.startup_time = mark_time();
@@ -490,9 +489,9 @@ s32 main(void)
 			{
 				String8 str;
 				Scratch scratch = find_scratch(0,0,0);
-				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n Swapchain \t%tus\n"
+				str = str8_print(scratch.arena, "Startup \t%tus\n Window \t%tus\n Instance \t%tus\n Surface \t%tus\n Device \t%tus\n - %cs\n Swapchain \t%tus\n"
 				"Frame  \t%tus (%u32 fps)\n Desired \t%tus\n Elapsed \t%tus (%u32)\n Sleep \t%tus\n Resize \t%tus\n Poll    \t%tus\n Draw   \t%t\n Font Resolve\t%t\n CB Wait \t%t\n CB Record \t%t\n", 
-				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, tidings.vk_swapchain_create_time,
+				tidings.startup_time, tidings.window_create_time, tidings.vk_instance_create_time, tidings.vk_surface_create_time, tidings.vk_device_create_time, device->physical.properties.deviceName, tidings.vk_swapchain_create_time,
 				tidings.frame_time, (u32)(f32)(1.0 / ((f64)tidings.frame_time / (f64)1000000000)), tidings.desired_frame_time, tidings.frame_elapsed_time, (u32)(((f32)tidings.frame_elapsed_time / (f32)tidings.desired_frame_time) * 100.0), tidings.frame_sleep_time, tidings.resize_time, tidings.poll_time, tidings.draw_time, tidings.font_resolve_time, tidings.cb_wait_time, tidings.cb_record_time);
 				f32x2 pen = f32x2_set(1,0);
 				pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);

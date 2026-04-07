@@ -2,7 +2,7 @@
 UIContext *initialize_ui_context(Arena *arena, GraphicsDeviceFontCache *font_cache)
 {
 	UIContext *context = arena_push(arena, true, sizeof(UIContext));
-	context->name_map_size = MiB(4);
+	context->name_map_size = KiB(8);
 	context->frame_accum = 1;
 	for(u32 i = 0; i < 2; i++)
 	{

@@ -13,7 +13,6 @@ Low Priority:
 
 
 
-
 Pile
 
 Build System
@@ -21,4 +20,53 @@ Build System
 Text Editor
 
 Boid Game
+
+
+typedef struct{
+	Window *window;
+	GraphicsInstance *instance;
+	GraphicsDevice *device;
+	GraphicsSurface surface;
+	GraphicsSwapchain swapchain;
+
+
+	b32 window_is_alive;
+	b32 instance_is_alive;
+	b32 device_is_alive;
+	b32 surface_is_alive;
+	b32 swapchain_is_alive;
+	b32 pipeline_state_is_alive;
+	b32 texture_state_is_alive;
+		b32 frame_resources_are_alive;
+
+	b32 audio_device_is_alive;
+		b32 audio_resources_are_alive;
+
+}LifetimeState;
+
+
+
+
+
+CreateAll(...)
+DestroyAll(...)
+
+	CreateWindowLifetime(...);
+
+	CreateInstanceLifetime(...);
+
+	CreateSurfaceLifetime(...);
+
+	CreateDeviceLieftime(...);
+
+	CreateSwapchainLifetime(...);
+
+	CreateFrameRecourcesLifetime(...);
+
+BeginRenderLoop(...);
+
+	CreateAudioLifetime(...);
+
+BeginAudioLoop(...);
+
 
