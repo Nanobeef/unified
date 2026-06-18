@@ -78,6 +78,8 @@ void handle_mouse_move_event(Arena *arena, Event *e, PolledEvents *pe)
 u32 poll_events(Arena *arena, Event *event_ring_buffer, PolledEvents *inpe)
 {
 	PolledEvents pe = *inpe;
+	pe.last_time = pe.time;
+	pe.time = get_time_ns();
 	for(u32 i = 0; i < offsetof(PolledEvents, last_button) - offsetof(PolledEvents, first_button); i++)
 	{
 		Button *b = &pe.first_button + 1;

@@ -169,8 +169,7 @@ UIBox *ui_box_widget(UIBox *box, UIWidgetType type, u32 count, UIBox **widget_ch
 	return box;
 }
 
-UIBox *ui_box_decoration(UIBox *box, UITheme *theme)
-{
+UIBox *ui_box_decoration(UIBox *box, UITheme *theme) {
 	if(NULL == box)
 		box = ui_element(0, (String8){0});
 	box->box_bits |= UI_BOX_DECORATION_BIT;
@@ -274,7 +273,11 @@ void draw_ui_widget(GraphicsDeviceVertexBuffer *vb, UIBox *widget)
 		}
 		if(box->box_bits & UI_BOX_TEXT_BIT)
 		{
-				
+			f32x2 p[] = {
+				box->fixed_position,
+				f32x2_add(box->fixed_position, box->fixed_size)
+			};
+			draw_str8_culled(vb, fc, p[0], p[1], box->text, box->text_point, f32x4_set1(1.0));
 		}
 	}
 
@@ -450,13 +453,13 @@ void ui_test()
 	RomuQuad rq = romu_quad_seed(323321);
 	UIContext *context = current_thread()->ui_data;
 	u32 count = (context->frame_accum * 10) % 4000;
-	count = 1;
+	count = 60;
 	count = Max(count, 1);
 	u64 t = get_time_ns();
 	for(u32 i = 0; i < count; i ++)
 	{
 		UIBox *widget = ui_element(0, (String8){0});
-		widget->fixed_size = f32x2_set(32, 32);
+		widget->fixed_size = f32x2_set(64, 32);
 		f32x2 rp = romu_quad_positive_f32x2(&rq);
 		rp = f32x2_mul(context->root->fixed_size, rp);
 		rp.x = floorf(rp.x);
@@ -465,10 +468,13 @@ void ui_test()
 
 		UIMouseEvent mouse_event = {.event.type = MOUSE_PRESS, .event.button = MOUSE_BUTTON_LEFT, .interactivity = UI_PRESSED};
 
+		String8 text = str8_print(context->frame_arena, "Box%u32\nThis text is \ntoo big for the box.", i);
+
 		UIBox* boxes[] = {
 			ui_box_decoration(ui_element(widget, str8_lit("dec")), 0),
 			ui_box_monostable_button_state(ui_element(widget, str8_lit("mono")), 0, 0),
 			ui_box_mouse_input(ui_element(widget, str8_lit("minput")), 1, &mouse_event),
+			ui_box_text(ui_element(widget, str8_lit("text")),  9, text),
 		};
 		ui_box_widget(widget, UI_WIDGET_MONOSTABLE_BUTTON, Arrlen(boxes), boxes);
 	}

@@ -23,7 +23,7 @@ typedef struct{
 	f32m3 src_affine;
 	f32m3 dst_affine;
 	f32m3 current_affine;
-	f32m3 inverse_affine;
+	f32m3 inverse_current_affine;
 
 	f32 src_zoom;
 	f32 dst_zoom;
@@ -59,4 +59,5 @@ typedef struct{
 
 }Camera;
 
+Camera init_camera(void);
 void update_camera(Camera *camera, PolledEvents pe, u32x2 window_size, b32 force_disable);

@@ -1,10 +1,13 @@
 
 
-void draw_glyph_internal(GraphicsDeviceFontCache *font_cache, GraphicsDeviceFont *font, GraphicsDeviceGlyph *glyph, FixedCamera camera, GraphicsDeviceVertexBuffer *vb, f32x2 pen, f32x4 color)
+
+typedef struct {
+	f32x2 cull;
+}GlyphInternal;
+
+void draw_glyph_internal(GraphicsDeviceFontCache *font_cache, GraphicsDeviceFont *font, GraphicsDeviceGlyph *glyph, FixedCamera camera, GraphicsDeviceVertexBuffer *vb, f32x2 pen, f32x4 color, GlyphInternal *options)
 {
-	f32x2 bearing = f32x2_set(glyph->glyph.bearing.x, -glyph->glyph.bearing.y);
-	f32x2 offset = bearing;
-	offset.y += font->unit_em.y;
+	f32x2 bearing = f32x2_set(glyph->glyph.bearing.x, font->unit_em.y - glyph->glyph.bearing.y);
 
 	Vertex2 vertices[4];
 	memset(vertices, 0, sizeof(vertices));
@@ -15,17 +18,31 @@ void draw_glyph_internal(GraphicsDeviceFontCache *font_cache, GraphicsDeviceFont
 		vertices[i].texture = f32x2_set(glyph->cache_position.x, glyph->cache_position.y);
 	}
 
+	f32x2 glyph_size = glyph->glyph.size;
+
+	if(options)
+	{
+		f32x2 size = glyph->glyph.size;
+		f32x2 d = f32x2_sub(
+			f32x2_add(f32x2_add(pen, bearing), size),
+			options->cull
+			);
+		d.x = fmax(0.0, fmin(d.x,size.x));
+		d.y = fmax(0.0, fmin(d.y, size.y));
+		glyph_size = f32x2_sub(size, d);
+	}
+
 	vertices[0].texture = f32x2_add(vertices[0].texture, f32x2_set(0, 0));
-	vertices[1].texture = f32x2_add(vertices[1].texture, f32x2_set(glyph->cache_size.x, 0));
-	vertices[2].texture = f32x2_add(vertices[2].texture, f32x2_set(0, glyph->cache_size.y));
-	vertices[3].texture = f32x2_add(vertices[3].texture, f32x2_set(glyph->cache_size.x, glyph->cache_size.y));
+	vertices[1].texture = f32x2_add(vertices[1].texture, f32x2_set(glyph_size.x, 0));
+	vertices[2].texture = f32x2_add(vertices[2].texture, f32x2_set(0, glyph_size.y));
+	vertices[3].texture = f32x2_add(vertices[3].texture, f32x2_set(glyph_size.x, glyph_size.y));
 
 	for(u32 i = 0; i < 4; i++)
 	{
 		vertices[i].position = f32x2_sub(vertices[i].texture, f32x2_cast_u32x2(glyph->cache_position));	
 		vertices[i].position = f32x2_mul(vertices[i].position, camera.unit_pixel);
 		vertices[i].position = f32x2_add(vertices[i].position, camera.top_left);
-		f32x2 o = f32x2_mul(f32x2_add(offset, pen), camera.unit_pixel);
+		f32x2 o = f32x2_mul(f32x2_add(bearing, pen), camera.unit_pixel);
 		vertices[i].position = f32x2_add(vertices[i].position, o);
 		if(glyph->in_cache == false)
 		{
@@ -33,6 +50,7 @@ void draw_glyph_internal(GraphicsDeviceFontCache *font_cache, GraphicsDeviceFont
 			vertices[i].color = f32x4_set(1.0, 0.0, 1.0, 1.0);
 		}
 	}
+
 
 	u32 indices[] = {
 		0,1,2,2,1,3,
@@ -46,7 +64,7 @@ void draw_glyph(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, u
 	GraphicsDeviceFont *font = graphics_device_font_compute_metrics(font_cache->default_font, pt);
 	GraphicsDeviceGlyph *glyph = load_graphics_device_glyph(vb->frame_arena, font_cache, 0, code, pt);
 
-	draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color);
+	draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color, 0);
 }
 
 f32x2 draw_str8(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, String8 str, f32 pt, f32x4 color)
@@ -57,9 +75,9 @@ f32x2 draw_str8(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, S
 
 f32x2 draw_str8_wrap(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32 wrap, String8 str, f32 pt, f32x4 color)
 {
-	f32x2 a = pen;
 	GraphicsDeviceFontCache *font_cache = vb->font_cache;
 	GraphicsDeviceFont *font = graphics_device_font_compute_metrics(font_cache->default_font, pt);
+	f32x2 a = pen;
 	f32 line_spacing = 1.0;
 	u32 tabstop = 8;
 	u32 last_newline = -1;
@@ -83,13 +101,13 @@ f32x2 draw_str8_wrap(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 p
 			pen.x += font->max_advance_width * m;
 			continue;
 		}
-		if(pen.x + glyph->glyph.advance > wrap)
+		if(pen.x + glyph->glyph.advance.x > wrap)
 		{
 			pen.y += font->unit_em.y * line_spacing;
 			pen.x = a.x;
 		}
-		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color);
-		pen.x += glyph->glyph.advance;
+		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color, 0);
+		pen.x += glyph->glyph.advance.x;
 		index++;
 	}
 	return pen;
@@ -103,12 +121,12 @@ f32x2 draw_str8_cutoff(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2
 	{
 		u32 code = str.data[i];
 		GraphicsDeviceGlyph *glyph = load_graphics_device_glyph(vb->frame_arena, font_cache, 0, code, pt);
-		if(pen.x + glyph->glyph.advance > cutoff)
+		if(pen.x + glyph->glyph.advance.x > cutoff)
 		{
 			return pen;
 		}
-		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color);
-		pen.x += glyph->glyph.advance;
+		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color, 0);
+		pen.x += glyph->glyph.advance.x;
 	}
 	return pen;
 }
@@ -121,20 +139,52 @@ f32x2 draw_str8_cutoff_relaxed(GraphicsDeviceVertexBuffer *vb, FixedCamera camer
 	{
 		u32 code = str.data[i];
 		GraphicsDeviceGlyph *glyph = load_graphics_device_glyph(vb->frame_arena, font_cache, 0, code, pt);
-		if(pen.x > glyph->glyph.advance + cutoff)
+		if(pen.x > glyph->glyph.advance.x + cutoff)
 		{
 			return pen;
 		}
-		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color);
-		pen.x += glyph->glyph.advance;
+		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color, 0);
+		pen.x += glyph->glyph.advance.x;
 	}
 	return pen;
 }
 
 
-f32x2 draw_str8_culled_box(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, String8 str, f32x2 pen, f32 pt, Str8DrawInfo info, f32x4 color)
+f32x2 draw_str8_culled(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32x2 cull, String8 str, f32 pt, f32x4 color)
 {
-	return pen;		
+	GraphicsDeviceFontCache *font_cache = vb->font_cache;
+	GraphicsDeviceFont *font = graphics_device_font_compute_metrics(font_cache->default_font, pt);
+	f32x2 a = pen;
+	f32 line_spacing = 1.0;
+	u32 tabstop = 8;
+	u32 last_newline = -1;
+	u32 index = 0;
+	for(u32 i = 0; i < str.len; i++)
+	{
+		u32 code = str.data[i];
+		GraphicsDeviceGlyph *glyph = load_graphics_device_glyph(vb->frame_arena, font_cache, 0, code, pt);
+		if(code == '\n')
+		{
+			pen.y += font->unit_em.y * line_spacing;
+			pen.x = a.x;
+			last_newline = index;
+			index++;
+			continue;
+		}
+		if(code == '\t')
+		{
+			u32 m = tabstop-((index - last_newline)%tabstop);
+			index+=m;
+			pen.x += font->max_advance_width * m;
+			continue;
+		}
+		GlyphInternal internal = {
+			.cull = cull,
+		};
+		draw_glyph_internal(font_cache, font, glyph, camera, vb, pen, color, &internal);
+		pen.x += glyph->glyph.advance.x;
+	}
+	return pen;
 }
 
 void draw_solid_triangle(GraphicsDeviceVertexBuffer *vb, f32x2 p[3], f32x4 color)
@@ -223,7 +273,7 @@ void draw_rectangle4(GraphicsDeviceVertexBuffer *vb, f32x2 p[2], f32x2 t[2], f32
 		v[0].texture = t[0];
 		v[1].texture = f32x2_set(t[0].x, t[1].y);
 		v[2].texture = t[1];
-		v[3].texture = f32x2_set(t[0].y, t[1].x);
+		v[3].texture = f32x2_set(t[1].y, t[0].x);
 	}
 	else
 	{

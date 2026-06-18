@@ -4,6 +4,7 @@ f32x2 draw_str8(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, S
 f32x2 draw_str8_wrap(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32 wrap, String8 str, f32 pt, f32x4 color);
 f32x2 draw_str8_cutoff(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32 cutoff, String8 str, f32 pt, f32x4 color);
 f32x2 draw_str8_cutoff_relaxed(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32 cutoff, String8 str, f32 pt, f32x4 color);
+f32x2 draw_str8_culled(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, f32x2 pen, f32x2 cull, String8 str, f32 pt, f32x4 color);
 
 typedef struct{
 	b32 wrap_enable;
@@ -12,7 +13,6 @@ typedef struct{
 	f32x2 box_a, box_b;
 }Str8DrawInfo;
 
-f32x2 draw_str8_culled_box(GraphicsDeviceVertexBuffer *vb, FixedCamera camera, String8 str, f32x2 pen, f32 pt, Str8DrawInfo info, f32x4 color);
 
 
 void draw_triangle(GraphicsDeviceVertexBuffer *vb, f32x2 p[3], f32x2 t[3], f32x4 c[3]);

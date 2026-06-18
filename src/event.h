@@ -252,6 +252,8 @@ typedef struct{
 
 	b32 window_should_resize;
 	b32 application_should_stop;
+	u64 time;
+	u64 last_time;
 }PolledEvents;
 
 void handle_mouse_move_event(Arena *arena, Event *e, PolledEvents *pe);

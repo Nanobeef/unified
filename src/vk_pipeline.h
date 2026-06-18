@@ -40,6 +40,7 @@ typedef struct{
 	GraphicsDevice *device;
 	VkRenderPass render_pass;
 	VkSampler mono_sampler;
+	VkSampler inspect_sampler;
 	GraphicsDescriptorSetLayout descriptor_set_layout;
 	VkPipelineLayout layout;
 	VkPipeline vertex2;	

@@ -66,6 +66,8 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 			.unnormalizedCoordinates = VK_TRUE,
 		};
 		VK_ASSERT(vkCreateSampler(device->handle, &info, vkb, &pipelines.mono_sampler));
+		info.unnormalizedCoordinates = VK_FALSE;
+		VK_ASSERT(vkCreateSampler(device->handle, &info, vkb, &pipelines.inspect_sampler));
 	}
 	VkImageLayout final_image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	VkImageLayout final_image_access = VK_ACCESS_TRANSFER_READ_BIT;
@@ -198,6 +200,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 
 		VkDescriptorSetLayoutBinding bindings[] = {
 			{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &pipelines.mono_sampler},
+			{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &pipelines.inspect_sampler},
 		};
 		pipelines.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 
@@ -467,6 +470,7 @@ void destroy_rasterization_pipelines(RasterizationPipelines pipelines)
 	destroy_graphics_descriptor_set_layout(pipelines.descriptor_set_layout);
 	vkDestroyRenderPass(device->handle, pipelines.render_pass, vkb);
 	vkDestroySampler(device->handle, pipelines.mono_sampler, vkb);
+	vkDestroySampler(device->handle, pipelines.inspect_sampler, vkb);
 	vkDestroyPipeline(device->handle, pipelines.vertex2, vkb);
 	vkDestroyPipeline(device->handle, pipelines.vertex2_wireframe, vkb);
 	vkDestroyPipelineLayout(device->handle, pipelines.layout, vkb);

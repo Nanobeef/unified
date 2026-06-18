@@ -44,73 +44,73 @@ u64 epoch_time_ns;
 	#include "window.h"
 
 // GRAPHICS
-#include "vk_instance.h"
-#include "vk_device.h"
-#include "vk_command.h"
-#include "vk_sync.h"
-#include "vk_memory.h"
-#include "vk_image.h"
-#include "vk_buffer.h"
-#include "vk_barrier.h"
-#include "vk_surface.h"
-#include "vk_swapchain.h"
-#include "vk_queue.h"
-#include "vk_descriptor.h"
-#include "vk_rasterize.h"
-#include "vk_pipeline.h"
-#include "vk_font.h"
-#include "vk_vertex_buffer.h"
-#include "vk_draw.h"
-#include "vk_query.h"
-#include "ui.h"
+	#include "vk_instance.h"
+	#include "vk_device.h"
+	#include "vk_command.h"
+	#include "vk_sync.h"
+	#include "vk_memory.h"
+	#include "vk_image.h"
+	#include "vk_buffer.h"
+	#include "vk_barrier.h"
+	#include "vk_surface.h"
+	#include "vk_swapchain.h"
+	#include "vk_queue.h"
+	#include "vk_descriptor.h"
+	#include "vk_rasterize.h"
+	#include "vk_pipeline.h"
+	#include "vk_font.h"
+	#include "vk_vertex_buffer.h"
+	#include "vk_draw.h"
+	#include "vk_query.h"
+	#include "ui.h"
 
 // AUDIO 
-#include <alsa/asoundlib.h>
-#include "audio.h"
+	#include <alsa/asoundlib.h>
+	#include "audio.h"
 
 // PILE
-#include "pile.h"
+	#include "pile.h"
 
 // GRAPHICS
-#include "vk_instance.c"
-#include "vk_device.c"
-#include "vk_command.c"
-#include "vk_sync.c"
-#include "vk_queue.c"
-#include "vk_surface.c"
-#include "vk_swapchain.c"
-#include "vk_image.c"
-#include "vk_buffer.c"
-#include "vk_memory.c"
-#include "vk_barrier.c"
-#include "vk_rasterize.c"
-#include "camera.c"
-#include "vk_vertex_buffer.c"
-#include "vk_font.c"
-#include "vk_descriptor.c"
-#include "vk_draw.c"
-#include "vk_query.c"
-#include "ui.c"
+	#include "vk_instance.c"
+	#include "vk_device.c"
+	#include "vk_command.c"
+	#include "vk_sync.c"
+	#include "vk_queue.c"
+	#include "vk_surface.c"
+	#include "vk_swapchain.c"
+	#include "vk_image.c"
+	#include "vk_buffer.c"
+	#include "vk_memory.c"
+	#include "vk_barrier.c"
+	#include "vk_rasterize.c"
+	#include "camera.c"
+	#include "vk_vertex_buffer.c"
+	#include "vk_font.c"
+	#include "vk_descriptor.c"
+	#include "vk_draw.c"
+	#include "vk_query.c"
+	#include "ui.c"
 
 // BASE
-#include "vector.c"
-#include "string.c"
-#include "process.c"
-#include "time.c"
-#include "arena.c"
-#include "thread.c"
-#include "file.c"
-#include "event.c"
-#include "print.c"
-#include "window.c"
-#include "collatz.c"
-#include "random.c"
+	#include "vector.c"
+	#include "string.c"
+	#include "process.c"
+	#include "time.c"
+	#include "arena.c"
+	#include "thread.c"
+	#include "file.c"
+	#include "event.c"
+	#include "print.c"
+	#include "window.c"
+	#include "collatz.c"
+	#include "random.c"
 
 // AUDIO 
-#include "audio.c"
+	#include "audio.c"
 
 // PILE
-#include "pile.c"
+	#include "pile.c"
 
 void init(void)
 {
@@ -137,6 +137,92 @@ void cleanup(void)
 	free_arena(main_arena);
 	exit(0);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void rng_test()
+{
+	RomuQuad rq = romu_quad_seed(5354);
+	u64 n = MiB(128);
+	u64 *dst  = malloc(n * sizeof(u64));
+
+
+	// First few itterations for warm up.
+
+	for(u32 j = 0; j < 100; j++)
+	{
+		u64 elapsed = get_time_ns();
+
+		for(u64 i = 0; i < n; i++)
+		{
+			if(1)
+			{
+				dst[i] = romu_quad(&rq);		
+			}
+			else
+			{
+				u16 temp[4];
+				for(u32 k = 0; k < 4; k++)
+				{
+					temp[k] = rand();	
+				}
+				memcpy(dst + i, temp, 8);
+			}
+		}
+
+		elapsed = get_time_ns() - elapsed;
+		f64 rate = (f64)n / (f64)elapsed;
+		rate *= 8.0;
+
+		print("Itteration %u32\n\t%u64 in %t\n\t%f64 bytes / ns\n", j,n, elapsed, rate);
+
+	}
+
+
+	// Set 'a' so results are not optimized out.
+	u64 a = 0;
+
+	for(u64 i = 0; i < n; i++)
+	{
+		a += dst[i];		
+	}
+	print("%u64\n", a);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 s32 main(void)
 {
@@ -190,25 +276,30 @@ s32 main(void)
 	GraphicsCommandPool **render_command_pools = create_graphics_command_pools(main_arena, device->main_queue_family, frame_count, 1);
 	GraphicsDeviceQueue render_queue = device->main_queue_family->queues[0];
 
-	VkFormat target_format = VK_FORMAT_B8G8R8A8_SRGB;
-	//VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
+	//VkFormat target_format = VK_FORMAT_B8G8R8A8_SRGB;
+	VkFormat target_format = VK_FORMAT_B8G8R8A8_UNORM;
 	VkImageFormatProperties target_format_properties;
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
+
+
 	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format, target_format == swapchain.format);
 
 	GraphicsDeviceFontCache *font_cache = create_graphics_device_font_cache(main_arena, device, window->screen_dpi);
 
 	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceVertexBuffer, world_vertex_buffers);
 	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceVertexBuffer, overlay_vertex_buffers);
+	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceVertexBuffer, inspect_vertex_buffers);
 	for(u32 i = 0; i < frame_count; i++)
 	{
 		u64 vb_size = MiB(64);
 		world_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, vb_size, sizeof(Vertex2), font_cache);
 		overlay_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, vb_size, sizeof(Vertex2), font_cache);
+		inspect_vertex_buffers[i] = create_graphics_device_vertex_buffer(device->host_cached_heap, 1024, sizeof(Vertex2), font_cache);
 	}
 	const u32 max_swapchain_image_count = 8;
 	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, target_images);
+	arena_push_type(main_arena, 0, max_swapchain_image_count, GraphicsDeviceImage, inspect_images);
 	GraphicsDeviceImage *msaa_images = 0;
 	if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 		msaa_images = arena_push(main_arena, 0, max_swapchain_image_count * sizeof(GraphicsDeviceImage));
@@ -219,6 +310,8 @@ s32 main(void)
 		else
 			target_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
+		inspect_images[i] = create_graphics_device_image(device, swapchain.size, target_format, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
 		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 			msaa_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, target_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL, sample_count);
 	}
@@ -228,22 +321,29 @@ s32 main(void)
 	for(u32 i = 0; i < frame_count; i++)
 	{
 		frame_descriptor_pools[i] = create_graphics_descriptor_pool(main_arena, device, 1, &rasterization_pipelines.descriptor_set_layout);
-		VkDescriptorImageInfo image_info = {
-			.imageView = font_cache->linear_image.view,
-			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		VkDescriptorImageInfo image_infos[2] = {
+			{
+				.imageView = font_cache->linear_image.view,
+				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			},
+			{
+				.imageView = inspect_images[frame_index].view,
+				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			}
 		};
 		VkWriteDescriptorSet write = {
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = frame_descriptor_pools[i]->descriptor_sets[0].handle,
 			.dstBinding = 0,
-			.descriptorCount = 1,
+			.descriptorCount = Arrlen(image_infos),
 			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo = &image_info,
+			.pImageInfo = image_infos,
 		};
 		vkUpdateDescriptorSets(device->handle, 1, &write, 0, 0);
 	}
 
 	Camera camera = init_camera();
+	Camera inspect_camera = init_camera();
 	FixedCamera fixed_camera = create_fixed_camera(window->size);
 
 	{
@@ -267,6 +367,25 @@ s32 main(void)
 			};
 			cmd_graphics_pipeline_barrier(cb, barrier);
 		}
+		for(u32 i = 0; i < frame_count; i++)
+		{
+			GraphicsImageMemoryBarrier image_barrier = {
+				.image = inspect_images[i],
+				.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				.src_access = VK_ACCESS_NONE,
+				.dst_access = VK_ACCESS_SHADER_READ_BIT,
+			};
+
+			GraphicsPipelineBarrier barrier = {
+				.image_memory_barrier_count = 1,
+				.image_memory_barriers = &image_barrier,
+				.src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				.dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			};
+			cmd_graphics_pipeline_barrier(cb, barrier);
+		}
+
 		end_graphics_command_buffer(cb);
 		submit_command_buffers(
 			render_queue,
@@ -395,7 +514,19 @@ s32 main(void)
 
 		}
 		tidings.poll_time = record_time();
-		update_camera(&camera, pe, window->size, false);
+		if(pe.m.pressed)
+		{
+			if(pe.last_time < pe.m.press_time)
+			{
+				inspect_camera = init_camera();
+			}
+				update_camera(&inspect_camera, pe, window->size, false);
+		}
+		else
+		{
+			update_camera(&camera, pe, window->size, false);
+		}
+
 
 		{
 			GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(world_vertex_buffers + frame_index, font_cache, frame_arena);
@@ -627,7 +758,95 @@ s32 main(void)
 				}
 			}
 			vkCmdEndRenderPass(cb.handle);
+
+
+
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Render Pass"), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+
+			if(pe.m.pressed)
+			{
+				{
+					GraphicsImageMemoryBarrier image_barriers[2] = {
+						{
+							.image = inspect_images[frame_index],
+							.old_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+							.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+							.src_access = VK_ACCESS_SHADER_READ_BIT,
+							.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+						},
+						{
+							.image = target_image,
+							.old_layout = 
+								(target_format == swapchain.format) 
+								? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 
+								: VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+							.new_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+							.src_access = VK_ACCESS_NONE,
+							.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+						}
+					};
+
+					GraphicsPipelineBarrier barrier = {
+						.image_memory_barrier_count = 2,
+						.image_memory_barriers = image_barriers,
+						.src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+					};
+					cmd_graphics_pipeline_barrier(cb, barrier);
+				}
+
+				cmd_blit_graphics_device_image(cb, target_image, inspect_images[frame_index]);
+
+				{
+					GraphicsImageMemoryBarrier image_barriers[2] = {
+						{
+							.image = inspect_images[frame_index],
+							.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+							.old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+							.dst_access = VK_ACCESS_SHADER_READ_BIT,
+							.src_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+						},
+						{
+							.image = target_image,
+							.new_layout = 
+								(target_format == swapchain.format) 
+								? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 
+								: VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+							.old_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+							.dst_access = VK_ACCESS_NONE,
+							.src_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+						}
+					};
+
+					GraphicsPipelineBarrier barrier = {
+						.image_memory_barrier_count = 2,
+						.image_memory_barriers = image_barriers,
+						.dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+						.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
+					};
+					cmd_graphics_pipeline_barrier(cb, barrier);
+				}
+				
+				cmd_begin_rasterization_render_pass(cb, rasterization_pipelines.render_pass, framebuffers[image_index], swapchain.size, f32x4_set(0.00, 0.00, 0.00, 1.0));
+				{
+					GraphicsDeviceVertexBuffer *vb = begin_graphics_device_vertex_buffer(inspect_vertex_buffers + frame_index, font_cache, frame_arena);
+
+					{
+						f32x2 p[] = {fixed_camera.top_left, fixed_camera.bottom_right};
+						f32x2 t[] = {{-0.0,-0.0}, {-1.0,-1.0}};
+						draw_rectangle(vb, p,t,f32x4_color_white);
+					}
+					
+					end_graphics_device_vertex_buffer(vb);
+					f32m3p mp = f32m3_padding(inspect_camera.current_affine);
+					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
+					cmd_draw_graphics_device_vertex_buffer(cb, vb[0]);
+					
+				}
+				vkCmdEndRenderPass(cb.handle);
+
+
+			}
 
 			if(target_format != swapchain.format)
 			{
@@ -647,7 +866,6 @@ s32 main(void)
 						.src_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 						.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT,
 					};
-					
 					cmd_graphics_pipeline_barrier(cb, barrier);
 				}
 				cmd_blit_graphics_device_image(cb, target_image, swapchain_image);
@@ -700,6 +918,7 @@ s32 main(void)
 		vkDestroyFramebuffer(device->handle, framebuffers[i], vkb);
 		if(swapchain.format != target_format)
 			destroy_graphics_device_image(target_images[i]);
+		destroy_graphics_device_image(inspect_images[i]);
 		if(sample_count > VK_SAMPLE_COUNT_1_BIT)
 			destroy_graphics_device_image(msaa_images[i]);
 			
@@ -710,6 +929,7 @@ s32 main(void)
 		destroy_graphics_descriptor_pool(frame_descriptor_pools[i]);
 		destroy_graphics_device_vertex_buffer(world_vertex_buffers[i]);
 		destroy_graphics_device_vertex_buffer(overlay_vertex_buffers[i]);
+		destroy_graphics_device_vertex_buffer(inspect_vertex_buffers[i]);
 		destroy_graphics_query_pool(timestamp_query_pools[i]);
 		destroy_graphics_query_pool(invocation_query_pools[i]);
 	}

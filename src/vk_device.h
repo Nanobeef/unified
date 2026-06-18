@@ -64,6 +64,7 @@ typedef struct GraphicsDevice{
 	GraphicsDeviceMemoryHeap *host_cached_heap;
 	GraphicsDeviceMemoryHeap *host_and_device_heap;
 	GraphicsDeviceMemoryHeap *device_heap;
+
 }GraphicsDevice;
 
 

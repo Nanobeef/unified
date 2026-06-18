@@ -25,7 +25,7 @@ typedef struct{
 	f32 pt;
 	f32x2 size;
 	f32x2 bearing;
-	f32 advance;
+	f32x2 advance;
 
 }Glyph;
 

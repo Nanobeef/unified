@@ -106,7 +106,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 	VkSurfaceCapabilitiesKHR surface_capabilities = {0};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical.handle, surface.handle, &surface_capabilities);
 
-	VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
 	VkSwapchainCreateInfoKHR info = {
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,

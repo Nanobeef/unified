@@ -190,7 +190,8 @@ GraphicsDeviceGlyph *load_graphics_device_glyph(Arena *arena, GraphicsDeviceFont
 			.pt = pt,
 			.size = f32x2_set((f32)gs->metrics.width/64.0, (f32)gs->metrics.height/64.0),
 			.bearing = f32x2_set((f32)gs->metrics.horiBearingX/64.0, (f32)gs->metrics.horiBearingY/64.0),
-			.advance = (f32)gs->metrics.horiAdvance/64.0,
+			.advance.x = (f32)gs->metrics.horiAdvance/64.0,
+			.advance.y = (f32)gs->metrics.vertAdvance/64.0,
 		};
 		slot->font = font;
 		u32x2 bitmap_size = u32x2_set(font->face->glyph->bitmap.width, font->face->glyph->bitmap.rows);
