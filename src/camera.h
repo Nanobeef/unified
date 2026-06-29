@@ -56,6 +56,7 @@ typedef struct{
 
 	f32x2 pixel_size;
 	f32x2 unit_pixel;
+// 
 
 }Camera;
 

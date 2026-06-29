@@ -9,6 +9,17 @@ Window *create_window(Arena *arena)
 		print("Error: Cannot connect to X server (xcb)\n");
 		return 0;
 	}
+    xcb_xkb_use_extension(connection,
+                          XCB_XKB_MAJOR_VERSION, 
+                          XCB_XKB_MINOR_VERSION);
+    
+
+    
+    xcb_xkb_per_client_flags(connection,
+                          XCB_XKB_ID_USE_CORE_KBD,                                                       
+                          XCB_XKB_PER_CLIENT_FLAG_DETECTABLE_AUTO_REPEAT,
+                          1,0,0,0);
+
 
 	const xcb_setup_t *setup = xcb_get_setup(connection);
 	xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);

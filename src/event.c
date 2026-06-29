@@ -15,15 +15,23 @@ void press_button(Arena *arena, Button *b, u64 time, ButtonEventType action)
 	}
 	if(action == KEYBOARD_PRESS)
 	{
+		if(b->pressed == false)
+		{
+			b->press_time = time;
+		}
+
 		b->pressed = true;
 		b->released = false;
-		b->press_time = time;
 	}
 	else
 	{
+		if(b->released == false)
+		{
+			b->release_time = time;
+		}
+
 		b->pressed = false;
 		b->released = true;
-		b->release_time = time;
 	}
 	b->action_time = time;
 }

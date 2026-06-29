@@ -2,6 +2,7 @@
 	#include <xcb/xcb_keysyms.h>
 	#include <xcb/xproto.h>
 	#include <xcb/randr.h>
+	#include <xcb/xkb.h>
 	#include <X11/keysym.h>
 
 	#define VK_USE_PLATFORM_XCB_KHR
@@ -518,6 +519,7 @@ s32 main(void)
 		{
 			if(pe.last_time < pe.m.press_time)
 			{
+				print("%etns\n");
 				inspect_camera = init_camera();
 			}
 				update_camera(&inspect_camera, pe, window->size, false);
