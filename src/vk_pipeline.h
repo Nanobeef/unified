@@ -25,7 +25,7 @@ typedef struct{
 	u32 local_x, local_y, local_z;
 }ComputePipeline;
 
-ComputePipeline create_compute_pipeline(GraphicsDevice *device, u64 data_size, const void* data);
+VkPipeline create_compute_pipeline_from_file(GraphicsDevice *device, VkPipelineLayout layout, const char *path);
 
 typedef struct{
 	VkShaderModule vertex2_vert;	
@@ -45,6 +45,8 @@ typedef struct{
 	VkPipelineLayout layout;
 	VkPipeline vertex2;	
 	VkPipeline vertex2_wireframe;
+	VkPipeline boid;
+
 
 	VkSampleCountFlags sample_count;
 	VkFormat format;

@@ -1,0 +1,33 @@
+#version 460
+
+#include "boid_comp.h"
+
+
+void resolve_boid(uint index)
+{
+	Boid b = readonly_boids.data[index];
+	uint state = index;
+	
+	b.position += b.velocity * 0.0001;
+
+	writeonly_boids.data[index] = b;
+
+	writeonly_indices.data[index] = readonly_indices.data[index] + 1;
+
+}
+
+void main()
+{
+	uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
+	uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
+	uint WORK_GROUP = gl_WorkGroupID.x;
+	uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
+	uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
+	uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
+
+	for(uint i = GLOBAL_INVOCATION; i < PC.boid_count; i += INVOCATION_COUNT)
+	{
+		resolve_boid(i);
+	}
+
+}

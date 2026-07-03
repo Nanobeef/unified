@@ -91,10 +91,10 @@ GraphicsDescriptorPool* create_graphics_descriptor_pool(Arena *arena, GraphicsDe
 		VkDescriptorSetAllocateInfo alloc_info = {
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 			.descriptorPool = pool->handle,
-			.descriptorSetCount = layout_count,
-			.pSetLayouts = layout_handles,
+			.descriptorSetCount = 1,
+			.pSetLayouts = &layout_handles[i],
 		};
-		VK_ASSERT(vkAllocateDescriptorSets(device->handle, &alloc_info, set_handles));
+		VK_ASSERT(vkAllocateDescriptorSets(device->handle, &alloc_info, &set_handles[i]));
 	}
 	for(u32 i = 0; i < layout_count; i++)
 	{

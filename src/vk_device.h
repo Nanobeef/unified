@@ -49,6 +49,8 @@ typedef struct GraphicsDevice{
 	VkDevice handle;	
 	PhysicalGraphicsDevice physical;
 
+	VkPipelineCache pipeline_cache;
+
 	u32 queue_family_count;
 	GraphicsDeviceQueueFamily *queue_families;
 

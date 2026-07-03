@@ -1,9 +1,5 @@
 
 
-
-
-
-
 typedef struct{
 	GraphicsDevice *device;
 	VkDescriptorSetLayout handle;

@@ -85,7 +85,7 @@ PipelineStatisticQueryResult *get_graphics_pipeline_statistic_query_pool_results
 	PipelineStatisticQueryResult *results = allocate_array(arena, PipelineStatisticQueryResult, used * stat_count);
 	if(used)
 	{
-		vkGetQueryPoolResults(pool.device->handle, pool.handle, 0, used, sizeof(u64) * used * stat_count, (void*)counters, sizeof(u64) * stat_count, VK_QUERY_RESULT_64_BIT);
+		vkGetQueryPoolResults(pool.device->handle, pool.handle, 0, used, sizeof(u64) * used * stat_count, (void*)counters, sizeof(u64) * stat_count, VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 	}
 	for(u32 i = 0; i < used; i++)
 	{
@@ -149,7 +149,7 @@ TimestampQueryResult *get_graphics_timestamp_query_pool_results(Arena *arena, Gr
 	arena_push_type(scratch.arena, false, used, u64, counters);
 	if(used)
 	{
-		vkGetQueryPoolResults(pool.device->handle, pool.handle, 0, used, sizeof(u64) * used, (void*)counters, sizeof(u64), VK_QUERY_RESULT_64_BIT);
+		vkGetQueryPoolResults(pool.device->handle, pool.handle, 0, used, sizeof(u64) * used, (void*)counters, sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
 		u64 period = (u64)pool.device->physical.properties.limits.timestampPeriod;
 		for(u64 i = 0; i < used; i++)
 		{
