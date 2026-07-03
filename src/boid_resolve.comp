@@ -2,32 +2,71 @@
 
 #include "boid_comp.h"
 
-
 void resolve_boid(uint index)
 {
 	Boid b = readonly_boids.data[index];
 	uint state = index;
 	
-	b.position += b.velocity * 0.0001;
+	vec2 position = vec2(b.position);
+	vec2 velocity = vec2(b.velocity);
+	position += velocity * 0.25;
+
+	b.position = f16vec2(position);
 
 	writeonly_boids.data[index] = b;
 
-	writeonly_indices.data[index] = readonly_indices.data[index] + 1;
+//	writeonly_indices.data[index] = readonly_indices.data[index] + 1;
 
 }
 
 void main()
 {
-	uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
-	uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
-	uint WORK_GROUP = gl_WorkGroupID.x;
-	uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
-	uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
-	uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
-
-	for(uint i = GLOBAL_INVOCATION; i < PC.boid_count; i += INVOCATION_COUNT)
+	if(gl_WorkGroupSize.x <= 64) // # 3
 	{
-		resolve_boid(i);
-	}
+		uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
+		uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
+		uint WORK_GROUP = gl_WorkGroupID.x;
+		uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
+		uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
+		uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
 
+		for(uint i = GLOBAL_INVOCATION; i < PC.boid_count; i += INVOCATION_COUNT)
+		{
+			resolve_boid(i);
+		}
+	}
+	else if(true) // # 1 fastest
+	{
+		uint lane          = gl_SubgroupInvocationID;
+		uint wave_size     = gl_SubgroupSize;
+		uint waves_per_wg  = gl_WorkGroupSize.x / wave_size;
+		uint wave_id       = gl_WorkGroupID.x * waves_per_wg + gl_SubgroupID;
+		uint num_waves     = gl_NumWorkGroups.x * waves_per_wg;
+
+		uint section_size  = (PC.boid_count + num_waves - 1) / num_waves;  // ← fixed
+		uint section_start = wave_id * section_size;
+
+		for(uint i = lane; i < section_size; i += wave_size)
+		{
+			uint idx = section_start + i;
+			if(idx < PC.boid_count)
+				resolve_boid(idx);
+		}
+	}
+	else // # 2
+	{
+		uint local_id  = gl_LocalInvocationID.x;
+		uint wg_size   = gl_WorkGroupSize.x;
+		uint wg_id     = gl_WorkGroupID.x;
+		uint num_wgs   = gl_NumWorkGroups.x;
+
+		uint elements_per_wg = (PC.boid_count + num_wgs - 1) / num_wgs;
+		uint tile_start      = wg_id * elements_per_wg;
+		uint tile_end        = min(tile_start + elements_per_wg, PC.boid_count);
+
+		for(uint i = tile_start + local_id; i < tile_end; i += wg_size)
+		{
+			resolve_boid(i);
+		}
+	}
 }

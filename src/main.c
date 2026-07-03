@@ -57,7 +57,6 @@ u64 epoch_time_ns;
 	#include "vk_swapchain.h"
 	#include "vk_queue.h"
 	#include "vk_descriptor.h"
-	#include "vk_rasterize.h"
 	#include "vk_pipeline.h"
 	#include "vk_font.h"
 	#include "vk_vertex_buffer.h"
@@ -97,7 +96,6 @@ u64 epoch_time_ns;
 	#include "ui.c"
 
 // BASE
-	#include "vector.c"
 	#include "string.c"
 	#include "process.c"
 	#include "time.c"

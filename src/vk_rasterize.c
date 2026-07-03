@@ -318,13 +318,13 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		{
 			.binding = 0,
 			.location = 0,
-			.format = VK_FORMAT_R32G32_SFLOAT,
+			.format = VK_FORMAT_R16G16_SFLOAT,
 			.offset = offsetof(Boid, position),
 		},
 		{
 			.binding = 0,
 			.location = 1,
-			.format = VK_FORMAT_R32G32_SFLOAT,
+			.format = VK_FORMAT_R16G16_SFLOAT,
 			.offset = offsetof(Boid, velocity),
 		},
 	};

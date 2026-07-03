@@ -15,8 +15,8 @@ typedef struct{
 }BoidVertexPushConstants;
 
 typedef struct{
-	f32x2 position;
-	f32x2 velocity;
+	f32 position;
+	f32 velocity;
 }Boid;
 
 typedef struct{

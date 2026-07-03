@@ -1,5 +1,9 @@
 
-layout (local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_KHR_shader_subgroup_basic : enable
+
+layout (local_size_x = 256) in;
 
 layout(push_constant) uniform PushConstant{
 	uint boid_count;
@@ -7,8 +11,8 @@ layout(push_constant) uniform PushConstant{
 }PC;
 
 struct Boid{
-	vec2 position;
-	vec2 velocity;
+	f16vec2 position;
+	f16vec2 velocity;
 };
 
 layout (binding = 0) readonly buffer ReadonlyBoids{

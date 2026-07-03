@@ -1,7 +1,10 @@
 #version 460
 
-layout(location = 0) in vec2 in_position;
-layout(location = 1) in vec2 in_velocity; 
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage : require
+
+layout(location = 0) in f16vec2 in_position;
+layout(location = 1) in f16vec2 in_velocity; 
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec2 out_velocity;
@@ -32,7 +35,7 @@ const vec2 center = vec2(0.0, 0.25);
 
 void main()
 {
-	vec2 u = normalize(in_velocity);
+	vec2 u = normalize(vec2(in_velocity));
 	u.y = -u.y;
 
 	vec2 p = vertices[gl_VertexIndex % 3];
@@ -42,7 +45,7 @@ void main()
 
 	p *= mat2(u.y, -u.x, u.x, u.y);
 	
-	p += in_position;
+	p += vec2(in_position);
 	p = transform_position(p);
 
 	gl_Position = vec4(p, 1.0, 1.0);

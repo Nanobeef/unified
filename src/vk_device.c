@@ -147,6 +147,18 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 		"VK_KHR_swapchain",	
 	};
 
+	VkPhysicalDeviceShaderFloat16Int8Features shader_float_16 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+		.shaderFloat16 = true,
+	};
+
+	VkPhysicalDevice16BitStorageFeatures features_16_bit_storage = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
+		.pNext = &shader_float_16,
+		.storageBuffer16BitAccess = true,
+		.storageInputOutput16 = true,
+	};
+	
 	VkPhysicalDeviceFeatures features = {
 		.fillModeNonSolid = true,
 		.pipelineStatisticsQuery = true,
@@ -155,6 +167,7 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 
 	VkDeviceCreateInfo info = {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pNext = &features_16_bit_storage,
 		.queueCreateInfoCount = queue_family_count,
 		.pQueueCreateInfos = queue_create_infos,
 		.enabledExtensionCount = Arrlen(extensions),
