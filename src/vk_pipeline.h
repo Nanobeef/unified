@@ -46,6 +46,7 @@ typedef struct{
 	VkPipeline vertex2;	
 	VkPipeline vertex2_wireframe;
 	VkPipeline boid;
+	VkPipeline boid_mesh;
 
 
 	VkSampleCountFlags sample_count;
@@ -57,7 +58,7 @@ typedef struct{
 	RasterizationPipelines rasterization;
 }GraphicsPipelines;
 
-RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain);
+RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain, VkDescriptorSetLayout boid_descriptor_set_layout);
 VkFramebuffer *create_rasterization_framebuffers(Arena *arena, RasterizationPipelines pipelines, u32 count, GraphicsDeviceImage *target_images, GraphicsDeviceImage *msaa_images);
 void destroy_rasterization_pipelines(RasterizationPipelines pipelines);
 void cmd_begin_rasterization_render_pass(GraphicsCommandBuffer cb, VkRenderPass render_pass, VkFramebuffer framebuffer, u32x2 size, f32x4 color);

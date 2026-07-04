@@ -102,6 +102,7 @@ PipelineStatisticQueryResult *get_graphics_pipeline_statistic_query_pool_results
 				case VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT: str = str8_lit("Vertex"); break;
 				case VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT: str = str8_lit("Fragment"); break;
 				case VK_QUERY_PIPELINE_STATISTIC_COMPUTE_SHADER_INVOCATIONS_BIT: str = str8_lit("Compute"); break;
+				case VK_QUERY_PIPELINE_STATISTIC_MESH_SHADER_INVOCATIONS_BIT_EXT: str = str8_lit("Mesh"); break;
 				default:break;
 
 			}

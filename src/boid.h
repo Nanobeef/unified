@@ -1,22 +1,19 @@
 
 
 typedef struct{
+	f32x4 color;			
+}BoidFragmentPushConstants;
+
+typedef struct{
+	f32m3p affine;
+	f32 scale;
 	u32 boid_count;
 	u32 random_seed;	
 }BoidComputePushConstants;
 
 typedef struct{
-	f32x4 color;			
-}BoidFragmentPushConstants;
-		
-typedef struct{
-	f32m3p affine;
-	f32 scale;
-}BoidVertexPushConstants;
-
-typedef struct{
-	f32 position;
-	f32 velocity;
+	f32x2 position;
+	f32x2 velocity;
 }Boid;
 
 typedef struct{

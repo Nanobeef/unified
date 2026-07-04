@@ -3,22 +3,19 @@
 #include "boid_comp.h"
 
 
-float16_t romu_mono_float16(inout uint state)
-{
-	return float16_t(romu_mono_float(state));
-}
 
 void reset_boid(uint index)
 {
 	uint random_state = romu_mono_init(index);
 	Boid b;
-
-	float16_t vel_factor = float16_t(0.25);
-
-	b.position.x = romu_mono_float16(random_state);
-	b.position.y = romu_mono_float16(random_state);
-	b.velocity.x = romu_mono_float16(random_state) * vel_factor;;
-	b.velocity.y = romu_mono_float16(random_state) * vel_factor;
+	b.position.x = romu_mono_float(random_state);
+	b.position.y = romu_mono_float(random_state);
+	vec2 pos = b.position;
+	vec2 vel = normalize(pos);
+	vel = vec2(-vel.y, vel.x);
+	b.velocity.x = romu_mono_float(random_state);
+	b.velocity.y = romu_mono_float(random_state);
+	b.velocity = vel;
 	writeonly_boids.data[index] = b;
 }
 

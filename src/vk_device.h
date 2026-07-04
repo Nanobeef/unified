@@ -67,7 +67,11 @@ typedef struct GraphicsDevice{
 	GraphicsDeviceMemoryHeap *host_and_device_heap;
 	GraphicsDeviceMemoryHeap *device_heap;
 
+	PFN_vkCmdDrawMeshTasksEXT vkCmdDrawMeshTasksEXT;
+
 }GraphicsDevice;
+
+#define load_vulkan_device_function( DEVICE, NAME ) (PFN_##NAME)vkGetDeviceProcAddr(DEVICE, #NAME)
 
 
 GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance, GraphicsDeviceType type_request);

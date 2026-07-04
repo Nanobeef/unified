@@ -145,10 +145,20 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 
 	const char *extensions[] = {
 		"VK_KHR_swapchain",	
+		VK_EXT_MESH_SHADER_EXTENSION_NAME,
+		VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+		"VK_KHR_shader_float_controls",
+	};
+
+	VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
+		.meshShader = true,
+		.taskShader = true,
 	};
 
 	VkPhysicalDeviceShaderFloat16Int8Features shader_float_16 = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+		.pNext = &mesh_shader_features,
 		.shaderFloat16 = true,
 	};
 
@@ -165,14 +175,19 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 
 	};
 
+	VkPhysicalDeviceFeatures2 features2 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.features = features,
+		.pNext = &features_16_bit_storage,
+	};
+
 	VkDeviceCreateInfo info = {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = &features_16_bit_storage,
+		.pNext = &features2,
 		.queueCreateInfoCount = queue_family_count,
 		.pQueueCreateInfos = queue_create_infos,
 		.enabledExtensionCount = Arrlen(extensions),
 		.ppEnabledExtensionNames = extensions,
-		.pEnabledFeatures = &features,
 	};
 
 	VK_ASSERT(vkCreateDevice(device->physical.handle, &info, vkb, &device->handle));
@@ -278,6 +293,8 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	{
 		device->memory_heaps[i].backup_chain = device->host_cached_heap;
 	}
+
+	device->vkCmdDrawMeshTasksEXT = load_vulkan_device_function(device->handle, vkCmdDrawMeshTasksEXT);
 
 	regress_scratch(scratch);
 	return device;

@@ -248,9 +248,10 @@ s32 main(void)
 	VkImageFormatProperties target_format_properties;
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
+	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(64));
 
 
-	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format, target_format == swapchain.format);
+	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format, target_format == swapchain.format, boid_sim.descriptor_set_layout.handle);
 
 	GraphicsDeviceFontCache *font_cache = create_graphics_device_font_cache(main_arena, device, window->screen_dpi);
 
@@ -376,7 +377,6 @@ s32 main(void)
 		);
 	}
 
-	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(64));
 
 
 	end_time(&tidings.startup_time);
@@ -660,8 +660,7 @@ s32 main(void)
 			boid_sim.compute_pc.boid_count = boid_sim.boid_count;
 
 			{
-				u32 dynamic_offsets[4] = {0,0,0,0};
-				vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.layout, 0, 1, &boid_sim.descriptor_sets[boid_sim.buffer_index].handle, Arrlen(dynamic_offsets), dynamic_offsets);
+				vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.layout, 0, 1, &boid_sim.descriptor_sets[boid_sim.buffer_index].handle, 0,0);
 				vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BoidComputePushConstants), &boid_sim.compute_pc);
 			}
 
@@ -679,7 +678,6 @@ s32 main(void)
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Boid "), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 1, &frame_descriptor_pools[frame_index]->descriptor_sets[0].handle, 0,0);
 
 
 			{
@@ -738,32 +736,48 @@ s32 main(void)
 
 				vertex_data_size = 0;
 				{
+
+					{
+						VkDescriptorSet sets[] = {
+							frame_descriptor_pools[frame_index]->descriptor_sets[0].handle,
+							boid_sim.descriptor_sets[boid_sim.buffer_index].handle,
+						};
+						vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 2, sets, 0,0);
+					}
 					f32m3p mp = f32m3_padding(camera.current_affine);
 					{
-						BoidVertexPushConstants pc = {
+						BoidComputePushConstants pc = {
 							.affine = mp,
 							.scale = 1.0,
+							.boid_count = boid_sim.boid_count,
 						};
-						vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+						vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT, 0, sizeof(pc), &pc);
 					}
 
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
 					// vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
-
-					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid);
 					u64 offset = 0;
 					vkCmdBindVertexBuffers(cb.handle, 0, 1, &boid_sim.boid_buffers[boid_sim.buffer_index].handle, &offset);
-
-					vkCmdDraw(cb.handle, 3, boid_sim.boid_count, 0,0);
+					if(pe.t.pressed == false)
+					{
+						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid);
+						vkCmdDraw(cb.handle, 3, boid_sim.boid_count, 0,0);
+					}
+					else
+					{
+						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_mesh);
+						u32 count = boid_sim.boid_count / (1024 * 4 * 64);
+						device->vkCmdDrawMeshTasksEXT(cb.handle, count, 1, 1);
+					}
 
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					cmd_end_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 				}
 				{
 					f32m3p mp = f32m3_padding(fixed_camera.affine);
-					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
+					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
 
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay")); cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
@@ -852,7 +866,7 @@ s32 main(void)
 					
 					end_graphics_device_vertex_buffer(vb);
 					f32m3p mp = f32m3_padding(inspect_camera.current_affine);
-					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
+					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(f32m3p), &mp);
 					cmd_draw_graphics_device_vertex_buffer(cb, vb[0]);
 					
 				}

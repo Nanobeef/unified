@@ -21,9 +21,9 @@ BoidGPUSimulation create_boid_gpu_simulation(Arena *arena, GraphicsDevice *devic
 		{
 			bindings[i] = (VkDescriptorSetLayoutBinding){
 				.binding = i,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				.descriptorCount = 1,
-				.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+				.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
 			};
 		}
 		sim.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
@@ -54,11 +54,6 @@ BoidGPUSimulation create_boid_gpu_simulation(Arena *arena, GraphicsDevice *devic
 				.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 				.size = sizeof(BoidFragmentPushConstants),
 			},
-			{
-				.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-				.offset = 0,
-				.size = sizeof(BoidFragmentPushConstants),
-			}
 		};
 		u32 offset = 0;
 		for(u32 i = 0; i < Arrlen(ranges); i++)
@@ -117,7 +112,7 @@ BoidGPUSimulation create_boid_gpu_simulation(Arena *arena, GraphicsDevice *devic
 			.dstBinding = i % 4,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			.pBufferInfo = &buffer_infos[buffer_indices[i]],
 		};
 	}

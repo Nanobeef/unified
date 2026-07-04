@@ -2,16 +2,17 @@
 
 #include "boid_comp.h"
 
+float lerp(float a, float b, float t)
+{
+	return (b-a) * t + a;
+}
+
 void resolve_boid(uint index)
 {
 	Boid b = readonly_boids.data[index];
 	uint state = index;
-	
-	vec2 position = vec2(b.position);
-	vec2 velocity = vec2(b.velocity);
-	position += velocity * 0.25;
 
-	b.position = f16vec2(position);
+	b.position += b.velocity * 0.0001;
 
 	writeonly_boids.data[index] = b;
 

@@ -39,7 +39,7 @@ VkShaderModule read_shader_file(GraphicsDevice *device, const char *name)
 
 
 
-RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain)
+RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain, VkDescriptorSetLayout boid_descriptor_set_layout)
 {
 	RasterizationPipelines rast = 	{
 		.device = device,
@@ -194,8 +194,8 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	{
 		VkPushConstantRange ranges[] = {
 			{
-				.size = sizeof(BoidVertexPushConstants),
-				.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+				.size = sizeof(BoidComputePushConstants),
+				.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT,
 			},
 			{
 				.size = sizeof(BoidFragmentPushConstants),
@@ -214,13 +214,17 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 			{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &rast.inspect_sampler},
 		};
 		rast.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
+		VkDescriptorSetLayout set_layouts[] = {
+			rast.descriptor_set_layout.handle,
+			boid_descriptor_set_layout,
+		};
 
 		VkPipelineLayoutCreateInfo info = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 			.pushConstantRangeCount = Arrlen(ranges),
 			.pPushConstantRanges = ranges,
-			.setLayoutCount = 1,
-			.pSetLayouts = &rast.descriptor_set_layout.handle,
+			.setLayoutCount = 2,
+			.pSetLayouts = set_layouts,
 		};
 		VK_ASSERT(vkCreatePipelineLayout(device->handle, &info, vkb, &rast.layout));
 	}
@@ -285,6 +289,8 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	};
 
 	VkShaderModule boid_vert_module = read_shader_file(device, "build/boid_vert.spv");
+	VkShaderModule boid_mesh_module = read_shader_file(device, "build/boid_mesh.spv");
+	VkShaderModule boid_task_module = read_shader_file(device, "build/boid_task.spv");
 	VkShaderModule boid_frag_module = read_shader_file(device, "build/boid_frag.spv");
 
 	VkPipelineShaderStageCreateInfo boid_vertex_stage = {
@@ -301,8 +307,29 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		.pName = "main",
 	};
 
+	VkPipelineShaderStageCreateInfo boid_mesh_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+		.module = boid_mesh_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_task_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_TASK_BIT_EXT,
+		.module = boid_task_module,
+		.pName = "main",
+	};
+
+
 	VkPipelineShaderStageCreateInfo boid_stages[] = {
 		boid_vertex_stage,
+		boid_fragment_stage,
+	};
+
+	VkPipelineShaderStageCreateInfo boid_mesh_stages[] = {
+		boid_task_stage,
+		boid_mesh_stage,
 		boid_fragment_stage,
 	};
 
@@ -318,13 +345,13 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		{
 			.binding = 0,
 			.location = 0,
-			.format = VK_FORMAT_R16G16_SFLOAT,
+			.format = VK_FORMAT_R32G32_SFLOAT,
 			.offset = offsetof(Boid, position),
 		},
 		{
 			.binding = 0,
 			.location = 1,
-			.format = VK_FORMAT_R16G16_SFLOAT,
+			.format = VK_FORMAT_R32G32_SFLOAT,
 			.offset = offsetof(Boid, velocity),
 		},
 	};
@@ -513,7 +540,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		.subpass = 0,
 		.layout = rast.layout,
 	};
-	VkGraphicsPipelineCreateInfo infos[3];
+	VkGraphicsPipelineCreateInfo infos[4];
 	for(u32 i = 0; i < Arrlen(infos); i++) {infos[i] = info;};
 
 	infos[1].pRasterizationState = &line_rasterization_state;
@@ -522,16 +549,23 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	infos[2].pStages = boid_stages;
 	infos[2].pVertexInputState = &boid_input_state;
 
+	infos[3].stageCount = Arrlen(boid_mesh_stages);
+	infos[3].pStages = boid_mesh_stages;
+	infos[3].pVertexInputState = 0;
+	infos[3].pInputAssemblyState = 0;
+
 	VkPipeline pipelines[3];
 	VK_ASSERT(vkCreateGraphicsPipelines(device->handle, 0, Arrlen(infos), infos, vkb, pipelines));
 	rast.vertex2 = pipelines[0];
 	rast.vertex2_wireframe = pipelines[1];
 	rast.boid = pipelines[2];
+	rast.boid_mesh = pipelines[3];
 
 	vkDestroyShaderModule(device->handle, vertex2_vert_module, vkb);
 	vkDestroyShaderModule(device->handle, vertex2_frag_module, vkb);
 
 	vkDestroyShaderModule(device->handle, boid_vert_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_mesh_module, vkb);
 	vkDestroyShaderModule(device->handle, boid_frag_module, vkb);
 		
 	return rast;
@@ -548,6 +582,7 @@ void destroy_rasterization_pipelines(RasterizationPipelines rast)
 	vkDestroyPipeline(device->handle, rast.vertex2, vkb);
 	vkDestroyPipeline(device->handle, rast.vertex2_wireframe, vkb);
 	vkDestroyPipeline(device->handle, rast.boid, vkb);
+	vkDestroyPipeline(device->handle, rast.boid_mesh, vkb);
 
 	vkDestroyPipelineLayout(device->handle, rast.layout, vkb);
 }
