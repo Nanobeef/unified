@@ -85,7 +85,7 @@ u64 epoch_time_ns;
 	#include "vk_buffer.c"
 	#include "vk_memory.c"
 	#include "vk_barrier.c"
-	#include "vk_rasterize.c"
+	#include "vk_pipeline.c"
 	#include "vk_compute.c"
 	#include "camera.c"
 	#include "vk_vertex_buffer.c"
@@ -189,6 +189,30 @@ void rng_test()
 		a += dst[i];		
 	}
 	print("%u64\n", a);
+}
+
+void cmd_general_memory_barrier(GraphicsCommandBuffer cb, VkPipelineStageFlags src, VkPipelineStageFlags dst)
+{
+	VkMemoryBarrier barrier = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+	};
+	if(src == VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
+	{
+		barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	}
+	else if(src == VK_PIPELINE_STAGE_TRANSFER_BIT)
+	{
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+	if(dst == VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT)
+	{
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	}
+	else if(dst == VK_PIPELINE_STAGE_TRANSFER_BIT)
+	{
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+	}
+	vkCmdPipelineBarrier(cb.handle, src,dst, 0, 1, &barrier, 0,0,0,0);
 }
 
 s32 main(void)
@@ -614,7 +638,7 @@ s32 main(void)
 					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
 					for(u32 i = 0; i < USED(results); i++)
 					{
-						str = str8_print(scratch.arena, " %s \t%tus\n",results[i].name, results[i].elapsed);
+						str = str8_print(scratch.arena, " %s \t%t\n",results[i].name, results[i].elapsed);
 						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
 						if(str8_equal(results[i].name, str8_lit("Draw World")))
 							draw_time += results[i].elapsed;
@@ -657,24 +681,109 @@ s32 main(void)
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Boid "), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			boid_sim.compute_pc.boid_count = boid_sim.boid_count;
 
 			{
 				vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.layout, 0, 1, &boid_sim.descriptor_sets[boid_sim.buffer_index].handle, 0,0);
-				vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BoidComputePushConstants), &boid_sim.compute_pc);
 			}
 
+			f32m3p mp = f32m3_padding(camera.current_affine);
+			{
+				BoidComputePushConstants pc = {
+					.affine = mp,
+					.scale = 1.0,
+					.boid_count = boid_sim.boid_count,
+					.grid_size = boid_sim.grid_size,
+					.pixel_size = swapchain.size,
+				};
+				vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, boid_compute_push_stages, 0, sizeof(pc), &pc);
+				vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, 0, sizeof(pc), &pc);
+			}
+
+
+
+
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			if(pe.r.pressed || frame_accum == 0)
 			{
+				
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.reset);
+				vkCmdDispatch(cb.handle, KiB(64), 1,1);
+				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			}
-			else
+			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			{
+
+
+
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Clear"), VK_PIPELINE_STAGE_TRANSFER_BIT);
+				vkCmdFillBuffer(cb.handle, boid_sim.grid_count_buffer.handle, 0, boid_sim.grid_count_buffer.size, 0);
+				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Clear"), VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Count"), VK_PIPELINE_STAGE_TRANSFER_BIT);
+				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.count);
+				vkCmdDispatch(cb.handle, KiB(64), 1,1);
+				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Count"), VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+
+
+				u32 cell_count = u32x2_area(boid_sim.grid_size);
+				u32 block_size = 64;
+				u32 kernel_index = 0;
+
+				while(kernel_index < 4 && false)
+				{
+					u32 src_count = cell_count;
+					u32 dst_count = cell_count;
+					u32 src_index = 0;
+					u32 dst_index = 0;
+					switch(kernel_index)
+					{
+					case 0:{
+						dst_index += dst_count;
+						dst_count /= 2;
+					}break;
+					case 1:{
+					}break;
+					case 2:{
+					}break;
+					case 3:{
+					}break;
+					}
+				}
+
+				{
+					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.prefix_sum);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+
+					u32 subgroup_size = 64;
+
+					u32 kernel_index = 0;
+					u32 work_group_count = cell_count;
+
+					String8 name = str8_print(frame_arena, "  Pfx Sum %u32", kernel_index);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+					vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, offsetof(BoidComputePushConstants, kernel_index), sizeof(u32), &kernel_index);
+					cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+					vkCmdDispatch(cb.handle, work_group_count, 1,1);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				}
+
+
+
+
+
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Res"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.resolve);
+				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				vkCmdDispatch(cb.handle, KiB(64), 1,1);
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Res"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			}
 
-
-			vkCmdDispatch(cb.handle, KiB(64), 1,1);
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Boid "), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
@@ -739,8 +848,8 @@ s32 main(void)
 
 					{
 						VkDescriptorSet sets[] = {
-							frame_descriptor_pools[frame_index]->descriptor_sets[0].handle,
 							boid_sim.descriptor_sets[boid_sim.buffer_index].handle,
+							frame_descriptor_pools[frame_index]->descriptor_sets[0].handle,
 						};
 						vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.layout, 0, 2, sets, 0,0);
 					}
@@ -750,18 +859,30 @@ s32 main(void)
 							.affine = mp,
 							.scale = 1.0,
 							.boid_count = boid_sim.boid_count,
+							.grid_size = boid_sim.grid_size,
+							.pixel_size = swapchain.size,
 						};
-						vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT, 0, sizeof(pc), &pc);
+						vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, boid_compute_push_stages, 0, sizeof(pc), &pc);
 					}
 
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
-					// vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
-					u64 offset = 0;
-					vkCmdBindVertexBuffers(cb.handle, 0, 1, &boid_sim.boid_buffers[boid_sim.buffer_index].handle, &offset);
+
+					{
+						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_grid_overlay);
+						device->vkCmdDrawMeshTasksEXT(cb.handle, 1, 1, 1);
+					}
+
+					{
+						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
+						// vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
+					}
+					if(true)
+					{
 					if(pe.t.pressed == false)
 					{
+						u64 offset = 0;
+						vkCmdBindVertexBuffers(cb.handle, 0, 1, &boid_sim.boid_buffers[boid_sim.buffer_index].handle, &offset);
 						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid);
 						vkCmdDraw(cb.handle, 3, boid_sim.boid_count, 0,0);
 					}
@@ -771,13 +892,15 @@ s32 main(void)
 						u32 count = boid_sim.boid_count / (1024 * 4 * 64);
 						device->vkCmdDrawMeshTasksEXT(cb.handle, count, 1, 1);
 					}
+					}
+
 
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					cmd_end_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 				}
 				{
 					f32m3p mp = f32m3_padding(fixed_camera.affine);
-					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(f32m3p), &mp);
+					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, boid_compute_push_stages, 0, sizeof(f32m3p), &mp);
 
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("Overlay")); cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw Overlay"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
@@ -866,7 +989,7 @@ s32 main(void)
 					
 					end_graphics_device_vertex_buffer(vb);
 					f32m3p mp = f32m3_padding(inspect_camera.current_affine);
-					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(f32m3p), &mp);
+					vkCmdPushConstants(cb.handle, rasterization_pipelines.layout, boid_compute_push_stages, 0, sizeof(f32m3p), &mp);
 					cmd_draw_graphics_device_vertex_buffer(cb, vb[0]);
 					
 				}

@@ -1,13 +1,16 @@
-
 #extension GL_KHR_shader_subgroup_basic : enable
 
-layout (local_size_x = 256) in;
 
 layout(push_constant) uniform PushConstant{
 	mat3 affine;
 	float scale;
 	uint boid_count;
-	uint random_seed;	
+	uint kernel_index;
+	uint padding;
+	uint src_index;
+	uint dst_index;
+	uvec2 grid_size;
+	uvec2 pixel_size;
 }PC;
 
 struct Boid{
@@ -15,21 +18,49 @@ struct Boid{
 	vec2 velocity;
 };
 
-layout (binding = 0) readonly buffer ReadonlyBoids{
+struct GridIndex{
+	uint offset_index;
+	uint index_in_cell;
+};
+
+layout (binding = 0) buffer ReadonlyBoids{
 	Boid data[];
 }readonly_boids;
 
-layout (binding = 1) writeonly buffer WriteonlyBoids{
+layout (binding = 1) buffer WriteonlyBoids{
 	Boid data[];
 }writeonly_boids;
 
-layout (binding = 2) readonly buffer ReadonlyIndices{
+layout (binding = 2) buffer ReadonlyIndices{
 	uint data[];
 }readonly_indices;
 
-layout (binding = 3) writeonly buffer WriteonlyIndices{
+layout (binding = 3) buffer WriteonlyIndices{
 	uint data[];
 }writeonly_indices;
+
+layout (binding = 4) buffer GridCounters{
+	uint data[];
+}grid_counters;
+
+layout (binding = 5) buffer GridOffsets{
+	uint data[];
+}grid_offsets;
+
+layout (binding = 6) buffer GridIndices{
+	GridIndex data[];
+}grid_indices;
+
+layout (binding = 7) buffer GridOffsetSums{
+	uint data[];
+}grid_offset_sums;
+
+vec2 transform_position(vec2 v)
+{
+	vec2 pos = v;
+	pos = (vec3(v, 1.0) * PC.affine).xy;
+	return pos.xy;
+}
 
 
 uint splitmix32(inout uint state)
@@ -70,4 +101,9 @@ float romu_mono_float(inout uint state)
 	data &= 0x007FFFFF;
 	data |= 0x40000000;
 	return uintBitsToFloat(data) - 3.0f;
+}
+
+float lerp(float a, float b, float t)
+{
+	return (b-a) * t + a;
 }

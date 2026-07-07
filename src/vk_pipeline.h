@@ -45,8 +45,10 @@ typedef struct{
 	VkPipelineLayout layout;
 	VkPipeline vertex2;	
 	VkPipeline vertex2_wireframe;
+
 	VkPipeline boid;
 	VkPipeline boid_mesh;
+	VkPipeline boid_grid_overlay;
 
 
 	VkSampleCountFlags sample_count;

@@ -172,6 +172,7 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	VkPhysicalDeviceFeatures features = {
 		.fillModeNonSolid = true,
 		.pipelineStatisticsQuery = true,
+		.fragmentStoresAndAtomics = true,
 
 	};
 

@@ -195,12 +195,8 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		VkPushConstantRange ranges[] = {
 			{
 				.size = sizeof(BoidComputePushConstants),
-				.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT,
+				.stageFlags = boid_compute_push_stages,
 			},
-			{
-				.size = sizeof(BoidFragmentPushConstants),
-				.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			}
 		};
 		u32 push_offset = 0;
 		for(u32 i = 0; i < Arrlen(ranges); i++)
@@ -215,8 +211,8 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		};
 		rast.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 		VkDescriptorSetLayout set_layouts[] = {
-			rast.descriptor_set_layout.handle,
 			boid_descriptor_set_layout,
+			rast.descriptor_set_layout.handle,
 		};
 
 		VkPipelineLayoutCreateInfo info = {
@@ -293,6 +289,9 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	VkShaderModule boid_task_module = read_shader_file(device, "build/boid_task.spv");
 	VkShaderModule boid_frag_module = read_shader_file(device, "build/boid_frag.spv");
 
+	VkShaderModule boid_grid_overlay_mesh_module = read_shader_file(device, "build/boid_grid_overlay_mesh.spv");
+	VkShaderModule boid_grid_overlay_frag_module = read_shader_file(device, "build/boid_grid_overlay_frag.spv");
+
 	VkPipelineShaderStageCreateInfo boid_vertex_stage = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
 		.stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -321,6 +320,20 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		.pName = "main",
 	};
 
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_mesh_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+		.module = boid_grid_overlay_mesh_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_frag_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = boid_grid_overlay_frag_module,
+		.pName = "main",
+	};
+
 
 	VkPipelineShaderStageCreateInfo boid_stages[] = {
 		boid_vertex_stage,
@@ -331,6 +344,11 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		boid_task_stage,
 		boid_mesh_stage,
 		boid_fragment_stage,
+	};
+
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_stages[] = {
+		boid_grid_overlay_mesh_stage,
+		boid_grid_overlay_frag_stage,
 	};
 
 	VkVertexInputBindingDescription boid_bindings[] = {
@@ -540,7 +558,7 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 		.subpass = 0,
 		.layout = rast.layout,
 	};
-	VkGraphicsPipelineCreateInfo infos[4];
+	VkGraphicsPipelineCreateInfo infos[5];
 	for(u32 i = 0; i < Arrlen(infos); i++) {infos[i] = info;};
 
 	infos[1].pRasterizationState = &line_rasterization_state;
@@ -554,19 +572,28 @@ RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, Vk
 	infos[3].pVertexInputState = 0;
 	infos[3].pInputAssemblyState = 0;
 
+	infos[4] = infos[3];
+	infos[4].stageCount = Arrlen(boid_grid_overlay_stages);
+	infos[4].pStages = boid_grid_overlay_stages;
+
 	VkPipeline pipelines[3];
 	VK_ASSERT(vkCreateGraphicsPipelines(device->handle, 0, Arrlen(infos), infos, vkb, pipelines));
 	rast.vertex2 = pipelines[0];
 	rast.vertex2_wireframe = pipelines[1];
 	rast.boid = pipelines[2];
 	rast.boid_mesh = pipelines[3];
+	rast.boid_grid_overlay = pipelines[4];
 
 	vkDestroyShaderModule(device->handle, vertex2_vert_module, vkb);
 	vkDestroyShaderModule(device->handle, vertex2_frag_module, vkb);
 
 	vkDestroyShaderModule(device->handle, boid_vert_module, vkb);
 	vkDestroyShaderModule(device->handle, boid_mesh_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_task_module, vkb);
 	vkDestroyShaderModule(device->handle, boid_frag_module, vkb);
+
+	vkDestroyShaderModule(device->handle, boid_grid_overlay_mesh_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_grid_overlay_frag_module, vkb);
 		
 	return rast;
 }
@@ -583,6 +610,7 @@ void destroy_rasterization_pipelines(RasterizationPipelines rast)
 	vkDestroyPipeline(device->handle, rast.vertex2_wireframe, vkb);
 	vkDestroyPipeline(device->handle, rast.boid, vkb);
 	vkDestroyPipeline(device->handle, rast.boid_mesh, vkb);
+	vkDestroyPipeline(device->handle, rast.boid_grid_overlay, vkb);
 
 	vkDestroyPipelineLayout(device->handle, rast.layout, vkb);
 }

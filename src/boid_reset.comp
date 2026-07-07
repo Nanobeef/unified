@@ -2,21 +2,43 @@
 
 #include "boid_comp.h"
 
+layout (local_size_x = 256) in;
 
 
 void reset_boid(uint index)
 {
 	uint random_state = romu_mono_init(index);
+	vec2 pos;
+	vec2 vel;
+	if(false)
+	{
+		float range = 0.5;
+		float d;
+		do{
+			pos.x = romu_mono_float(random_state) * range;
+			pos.y = romu_mono_float(random_state) * range;
+			d = distance(pos, vec2(0.0));
+		}while(d > 0.5 || d < 0.2);
+
+		vel = normalize(pos);
+		vel = vec2(-vel.y, vel.x);
+	}
+	else
+	{
+		pos.x = romu_mono_float(random_state);
+		pos.y = romu_mono_float(random_state);
+		vel.x = romu_mono_float(random_state);
+		vel.y = romu_mono_float(random_state);
+	}
+
+
+
+
 	Boid b;
-	b.position.x = romu_mono_float(random_state);
-	b.position.y = romu_mono_float(random_state);
-	vec2 pos = b.position;
-	vec2 vel = normalize(pos);
-	vel = vec2(-vel.y, vel.x);
-	b.velocity.x = romu_mono_float(random_state);
-	b.velocity.y = romu_mono_float(random_state);
 	b.velocity = vel;
+	b.position = pos;
 	writeonly_boids.data[index] = b;
+	readonly_boids.data[index] = b;
 }
 
 void main()

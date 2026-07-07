@@ -1,6 +1,7 @@
 #version 460
-#pragma shader_stage(mesh)
 #extension GL_EXT_mesh_shader : require
+
+#include "boid_comp.h"
 
 layout(local_size_x = 64) in;
 layout(max_vertices = 192, max_primitives = 64) out;
@@ -8,35 +9,12 @@ layout(triangles) out;
 
 layout(location = 0) out vec4 out_color[];
 
-layout(push_constant) uniform PushConstant{
-	mat3 affine;
-	float scale;
-	uint boid_count;
-	uint random_seed;	
-}PC;
-
 struct TaskPayload
 {
 	uint offset;
 };
 
 taskPayloadSharedEXT TaskPayload payload;
-
-vec2 transform_position(vec2 v)
-{
-	vec2 pos = v;
-	pos = (vec3(v, 1.0) * PC.affine).xy;
-	return pos.xy;
-}
-
-struct Boid{
-	vec2 position;
-	vec2 velocity;
-};
-
-layout (set = 1, binding = 0) readonly buffer ReadonlyBoids{
-	Boid data[];
-}readonly_boids;
 
 const vec2 vertices[3] = {
 	vec2(0.0, -1.0),

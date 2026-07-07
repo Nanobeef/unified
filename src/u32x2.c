@@ -125,6 +125,11 @@ u32x2 u32x2_abs(u32x2 v)
 	return dst;
 }
 
+u32 u32x2_area(u32x2 v)
+{
+	return v.x * v.y;
+}
+
 u32 u32x2_length_squared(u32x2 v)
 {
 	u32 dst = v.x * v.x + v.y * v.y;

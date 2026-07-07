@@ -8,8 +8,6 @@ layout(location = 0) out vec4 out_color;
 layout(push_constant) uniform PushConstant{
 	mat3 affine;
 	float scale;
-	uint boid_count;
-	uint random_seed;
 }PC;
 
 vec2 transform_position(vec2 v)
@@ -33,15 +31,18 @@ const vec2 center = vec2(0.0, 0.25);
 
 void main()
 {
+
 	vec2 u = normalize(in_velocity);
-	u.y = -u.y;
 
 	vec2 p = vertices[gl_VertexIndex % 3];
 
 	p += center;
-	p *= PC.scale * 0.0001;
+	p *= PC.scale * 0.00001;
 
-	p *= mat2(u.y, -u.x, u.x, u.y);
+	p *= mat2(
+		-u.y, -u.x,
+		u.x, -u.y
+	);
 	
 	p += vec2(in_position);
 	p = transform_position(p);

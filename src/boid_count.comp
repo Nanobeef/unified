@@ -1,0 +1,36 @@
+
+#version 460
+
+#include "boid_comp.h"
+
+layout (local_size_x = 256) in;
+
+
+void count_boid(uint boid_index)
+{
+	vec2 p = readonly_boids.data[boid_index].position;
+
+	p += 1.0;
+	p *= 0.5;
+
+	uvec2 grid_index = uvec2(floor(p * vec2(PC.grid_size)));
+
+	uint counter_index = PC.grid_size.x * grid_index.y + grid_index.x;
+
+	atomicAdd(grid_counters.data[counter_index], 1);
+}
+
+void main()
+{
+	uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
+	uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
+	uint WORK_GROUP = gl_WorkGroupID.x;
+	uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
+	uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
+	uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
+
+	for(uint i = GLOBAL_INVOCATION; i < PC.boid_count; i += INVOCATION_COUNT)
+	{
+		count_boid(i);
+	}
+}

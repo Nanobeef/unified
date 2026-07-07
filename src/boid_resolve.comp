@@ -2,22 +2,35 @@
 
 #include "boid_comp.h"
 
-float lerp(float a, float b, float t)
-{
-	return (b-a) * t + a;
-}
+layout (local_size_x = 256) in;
+
 
 void resolve_boid(uint index)
 {
 	Boid b = readonly_boids.data[index];
 	uint state = index;
 
-	b.position += b.velocity * 0.0001;
+	vec2 pos = b.position;
+	vec2 vel = b.velocity;
 
+	pos += vel * 0.00001;
+
+	if(pos.x > 1.0)
+		pos.x -= 2.0;
+
+	if(pos.x < -1.0)
+		pos.x += 2.0;
+
+	if(pos.y > 1.0)
+		pos.y -= 2.0;
+
+	if(pos.y < -1.0)
+		pos.y += 2.0;
+	
+
+	b.position = pos;
+	b.velocity = vel;
 	writeonly_boids.data[index] = b;
-
-//	writeonly_indices.data[index] = readonly_indices.data[index] + 1;
-
 }
 
 void main()
