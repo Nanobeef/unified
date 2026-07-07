@@ -17,7 +17,9 @@ void count_boid(uint boid_index)
 
 	uint counter_index = PC.grid_size.x * grid_index.y + grid_index.x;
 
-	atomicAdd(grid_counters.data[counter_index], 1);
+	uint index_in_cell = atomicAdd(grid_counters.data[counter_index], 1);
+	GridIndex write = {counter_index, index_in_cell};
+	grid_indices.data[boid_index] = write;
 }
 
 void main()

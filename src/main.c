@@ -712,9 +712,6 @@ s32 main(void)
 			}
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			{
-
-
-
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Clear"), VK_PIPELINE_STAGE_TRANSFER_BIT);
 				vkCmdFillBuffer(cb.handle, boid_sim.grid_count_buffer.handle, 0, boid_sim.grid_count_buffer.size, 0);
 				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
@@ -727,54 +724,90 @@ s32 main(void)
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Count"), VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 
-
 				u32 cell_count = u32x2_area(boid_sim.grid_size);
-				u32 block_size = 64;
+				u32 wave_size = 64;
 				u32 kernel_index = 0;
+				u32 dispatch_index = 0;
+				u32 src_index = 0;
+				u32 wave_count = cell_count / wave_size;
+				u32 dst_index = cell_count;
+				u32 small_wave_count = wave_size;
 
-				while(kernel_index < 4 && false)
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.prefix_sum);
+				while(kernel_index < 4)
 				{
-					u32 src_count = cell_count;
-					u32 dst_count = cell_count;
-					u32 src_index = 0;
-					u32 dst_index = 0;
+					if(!((kernel_index == 2) && (wave_count < wave_size)))
+					{
+						//print("%u32\n", wave_count);
+						String8 name = str8_print(frame_arena, "  Pfx Sum %u32 (%u32)", dispatch_index, kernel_index);
+						cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+						u32 pc[3] = {kernel_index, src_index, dst_index};
+						vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, offsetof(BoidComputePushConstants, kernel_index), sizeof(pc), pc);
+						cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+						vkCmdDispatch(cb.handle, wave_count, 1,1);
+						cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+						if(false)
+						{
+							print("Kernel %u32:\n"
+								" src_index: %u32\n"
+								" dst_index: %u32\n"
+								" wave_count: %u32\n",
+								kernel_index, src_index, dst_index, wave_count);
+						}
+					}
+						
+
 					switch(kernel_index)
 					{
-					case 0:{
-						dst_index += dst_count;
-						dst_count /= 2;
-					}break;
-					case 1:{
-					}break;
-					case 2:{
-					}break;
-					case 3:{
-					}break;
+						case 0:{
+							dst_index = wave_count;
+							wave_count /= wave_size;
+							kernel_index = 1;
+						}break;
+						case 1:{
+							if(wave_count == 1)
+							{
+								wave_count = small_wave_count;
+								Swap(u32, src_index, dst_index);
+								kernel_index++;
+
+								break;
+							}
+							if(wave_count < wave_size)
+							{
+								small_wave_count = wave_count;	
+								src_index = dst_index;
+								dst_index += wave_count;
+								wave_count = 1;
+							}
+							else
+							{
+								src_index = dst_index;
+								dst_index += wave_count;
+								wave_count /= wave_size;
+							}
+						}break;
+						case 2:{
+							if(wave_count == cell_count / wave_size)
+							{
+								src_index = dst_index;
+								kernel_index++;
+							}
+							else
+							{
+								src_index = dst_index;
+								wave_count *= wave_size;
+								dst_index -= wave_count;
+							}
+						}break;
+						case 3:{
+							kernel_index++;
+						}break;
 					}
+					dispatch_index++;
+
 				}
-
-				{
-					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.prefix_sum);
-					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-
-
-					u32 subgroup_size = 64;
-
-					u32 kernel_index = 0;
-					u32 work_group_count = cell_count;
-
-					String8 name = str8_print(frame_arena, "  Pfx Sum %u32", kernel_index);
-					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-					vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, offsetof(BoidComputePushConstants, kernel_index), sizeof(u32), &kernel_index);
-					cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-					vkCmdDispatch(cb.handle, work_group_count, 1,1);
-					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-				}
-
-
-
-
-
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Res"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);

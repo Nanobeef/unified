@@ -5,8 +5,8 @@ layout(push_constant) uniform PushConstant{
 	mat3 affine;
 	float scale;
 	uint boid_count;
-	uint kernel_index;
 	uint padding;
+	uint kernel_index;
 	uint src_index;
 	uint dst_index;
 	uvec2 grid_size;
@@ -53,7 +53,7 @@ layout (binding = 6) buffer GridIndices{
 
 layout (binding = 7) buffer GridOffsetSums{
 	uint data[];
-}grid_offset_sums;
+}grid_prefix_sums;
 
 vec2 transform_position(vec2 v)
 {

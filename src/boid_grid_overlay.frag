@@ -14,15 +14,16 @@ vec4 lerp(vec4 a, vec4 b, float t)
 
 void main()
 {
-	uvec2 grid_index = uvec2(floor(in_position * vec2(PC.grid_size)));
+	uvec2 grid_index = uvec2(floor(in_position * vec2(PC.grid_size.x, PC.grid_size.y)));
 	uint counter_index = PC.grid_size.x * grid_index.y + grid_index.x;
 
 
 	uint counter = 0;
 	float counter_color = 0.0;
 	{
+		//counter = grid_offsets.data[counter_index];
 		counter = grid_offsets.data[counter_index];
-		counter_color = float(counter) / (1024 * 1024 * 64);
+		counter_color = float(counter) / float(PC.boid_count);
 	}
 
 

@@ -10,5 +10,48 @@ layout (local_size_x = 64) in;
 
 void main()
 {
-	
+	uint cell_count = PC.grid_size.x * PC.grid_size.y;
+	switch(PC.kernel_index)
+	{
+	case 0:{
+		uint count = grid_counters.data[PC.src_index + gl_GlobalInvocationID.x];		
+		uint prefix_sum = subgroupExclusiveAdd(count);
+		grid_prefix_sums.data[gl_GlobalInvocationID.x] = prefix_sum;
+		if(gl_LocalInvocationID.x == gl_WorkGroupSize.x - 1)
+		{
+			grid_prefix_sums.data[PC.dst_index + gl_WorkGroupID.x] = prefix_sum + count;
+		}
+	}break;
+	case 1:{
+		if(gl_LocalInvocationID.x >= (PC.dst_index - PC.src_index))
+		{
+			break;
+		}
+		uint src_index = PC.src_index + cell_count;
+		uint dst_index = PC.dst_index + cell_count;
+		uint count = grid_prefix_sums.data[src_index + gl_GlobalInvocationID.x];		
+		uint prefix_sum = subgroupExclusiveAdd(count);
+		grid_prefix_sums.data[src_index + gl_GlobalInvocationID.x] = prefix_sum;
+		if(gl_LocalInvocationID.x == gl_WorkGroupSize.x - 1)
+		{
+			grid_prefix_sums.data[dst_index + gl_WorkGroupID.x] = prefix_sum + count;
+		}
+	}break;
+	case 2:{
+		uint src_index = PC.src_index + cell_count;
+		uint dst_index = PC.dst_index + cell_count;
+
+		uint count = grid_prefix_sums.data[src_index + gl_WorkGroupID.x];
+		grid_prefix_sums.data[dst_index + gl_GlobalInvocationID.x] += count;
+	}break;
+	case 3:{
+		uint src_index = cell_count;
+
+		uint count = grid_prefix_sums.data[src_index + gl_WorkGroupID.x];
+		grid_offsets.data[gl_GlobalInvocationID.x] = grid_prefix_sums.data[gl_GlobalInvocationID.x] += count;
+		
+	}break;
+	default:
+	break;
+	}
 }

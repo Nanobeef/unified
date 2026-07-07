@@ -8,8 +8,8 @@ typedef struct{
 	f32m3p affine;
 	f32 scale;
 	u32 boid_count;
-	u32 kernel_index;
 	u32 padding;
+	u32 kernel_index;
 	u32 src_index;
 	u32 dst_index;
 	u32x2 grid_size;

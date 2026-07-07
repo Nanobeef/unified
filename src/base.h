@@ -47,6 +47,8 @@ typedef double f64;
 
 #define Min(a,b) (((a) < (b)) ? (a) : (b))
 #define Max(a,b) (((a) > (b)) ? (a) : (b))
+#define Square(a) ((a) * (a))
+#define Swap(T, a, b) {T t = a; (a) = (b); (b) = (t);}
 
 #define Arrlen( XXX ) (sizeof(XXX) / sizeof((XXX)[0]))
 

@@ -6,7 +6,7 @@ BoidGPUSimulation create_boid_gpu_simulation(Arena *arena, GraphicsDevice *devic
 		.device = device,
 		.max_boid_count = max_boid_count,
 		.boid_count = max_boid_count,
-		.grid_size = u32x2_set(2048,2048),
+		.grid_size = u32x2_set1(2048),
 	};
 
 	for(u32 i = 0; i < 2; i++)
