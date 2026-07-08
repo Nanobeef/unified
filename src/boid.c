@@ -74,8 +74,9 @@ BoidGPUSimulation create_boid_gpu_simulation(Arena *arena, GraphicsDevice *devic
 
 
 	sim.pipelines.reset = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_reset_comp.spv");
-	sim.pipelines.resolve = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_resolve_comp.spv");
 	sim.pipelines.count = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_count_comp.spv");
+	sim.pipelines.resolve = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_resolve_comp.spv");
+	sim.pipelines.fill = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_fill_comp.spv");
 	sim.pipelines.prefix_sum  = create_compute_pipeline_from_file(device, sim.pipelines.layout, "build/boid_prefix_sum_comp.spv");
 
 	VkDescriptorBufferInfo buffer_infos[8] = {
@@ -162,6 +163,7 @@ void destroy_boid_gpu_simulation(BoidGPUSimulation sim)
 	vkDestroyPipeline(sim.device->handle, sim.pipelines.resolve, vkb);
 	vkDestroyPipeline(sim.device->handle, sim.pipelines.count, vkb);
 	vkDestroyPipeline(sim.device->handle, sim.pipelines.prefix_sum, vkb);
+	vkDestroyPipeline(sim.device->handle, sim.pipelines.fill, vkb);
 	vkDestroyPipelineLayout(sim.device->handle, sim.pipelines.layout, vkb);
 	destroy_graphics_descriptor_pool(sim.descriptor_pool);
 	destroy_graphics_descriptor_set_layout(sim.descriptor_set_layout);

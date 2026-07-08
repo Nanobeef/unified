@@ -13,7 +13,8 @@ GraphicsDeviceBuffer create_graphics_device_buffer(GraphicsDeviceMemoryHeap *hea
 		.usage = usage,
 	};
 
-	VK_ASSERT(vkCreateBuffer(heap->device->handle, &info, vkb, &buffer.handle));
+	VkResult result = 0;
+	VK_ASSERT(result = vkCreateBuffer(heap->device->handle, &info, vkb, &buffer.handle));
 
 	VkMemoryRequirements requirements = {0};
 	vkGetBufferMemoryRequirements(heap->device->handle, buffer.handle, &requirements);

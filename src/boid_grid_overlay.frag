@@ -21,9 +21,16 @@ void main()
 	uint counter = 0;
 	float counter_color = 0.0;
 	{
-		//counter = grid_offsets.data[counter_index];
-		counter = grid_offsets.data[counter_index];
-		counter_color = float(counter) / float(PC.boid_count);
+		if(true)
+		{
+			counter = grid_counters.data[counter_index];
+			counter_color = float(counter) / float(64);
+		}
+		else
+		{
+			counter = grid_offsets.data[counter_index];
+			counter_color = float(counter) / float(PC.boid_count);
+		}
 	}
 
 

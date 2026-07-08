@@ -4,16 +4,77 @@
 
 layout (local_size_x = 256) in;
 
+#define u32 uint
+
+vec4 lerp(vec4 a, vec4 b, float t)
+{
+	return (b-a) * t + a;
+}
+vec2 lerp(vec2 a, vec2 b, float t)
+{
+	return (b-a) * t + a;
+}
+
+vec4 average_boid_within_radius(Boid src, float radius)
+{
+	vec4 avg = vec4(0.0);
+	u32 total = 0;
+
+	vec2 pos = src.position;
+	uvec2 a,b;
+	{
+		vec2 p = (pos + 1.0) / 2;
+		a = uvec2(floor((p - radius) * vec2(PC.grid_size)));
+		b = uvec2(floor((p + radius) * vec2(PC.grid_size)));
+	}
+
+	for(u32 gx = a.x; gx < b.x; gx++)
+	{
+		for(u32 gy = a.y; gy < b.y; gy++)
+		{
+			u32 x = gx % PC.grid_size.x;
+			u32 y = gy % PC.grid_size.y;
+			u32 cell_index = x + PC.grid_size.x * y;
+			u32 c = grid_counters.data[cell_index];
+			u32 offset = grid_offsets.data[cell_index];
+			for(u32 i = 0; i < c; i++)
+			{
+				Boid b = readonly_boids.data[offset + i];
+				if(distance(b.position, src.position) < radius)
+				{
+					avg += vec4(b.position, b.velocity);
+					total += c;
+				}
+			}
+		}
+	}
+	{
+		return avg / float(total);
+	}
+}
 
 void resolve_boid(uint index)
 {
 	Boid b = readonly_boids.data[index];
 	uint state = index;
 
+	vec2 cell_size = 1.0 / vec2(PC.grid_size);
+
+
 	vec2 pos = b.position;
 	vec2 vel = b.velocity;
 
-	pos += vel * 0.00001;
+	vec4 avg = average_boid_within_radius(b, cell_size.x);
+	vel = lerp(vel, avg.ba, 0.5);
+
+	float speed = length(vel);
+	speed = lerp(speed, 0.0001, 0.1);
+	vel = normalize(vel) * speed;
+
+	pos += vel;
+
+
+
 
 	if(pos.x > 1.0)
 		pos.x -= 2.0;

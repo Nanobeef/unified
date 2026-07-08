@@ -10,7 +10,17 @@ void reset_boid(uint index)
 	uint random_state = romu_mono_init(index);
 	vec2 pos;
 	vec2 vel;
-	if(false)
+	switch(PC.kernel_index)
+	{
+	default:
+	case 0:
+	{
+		pos.x = romu_mono_float(random_state);
+		pos.y = romu_mono_float(random_state);
+		vel.x = romu_mono_float(random_state);
+		vel.y = romu_mono_float(random_state);
+	}break;
+	case 1:
 	{
 		float range = 0.5;
 		float d;
@@ -22,15 +32,10 @@ void reset_boid(uint index)
 
 		vel = normalize(pos);
 		vel = vec2(-vel.y, vel.x);
-	}
-	else
-	{
-		pos.x = romu_mono_float(random_state);
-		pos.y = romu_mono_float(random_state);
-		vel.x = romu_mono_float(random_state);
-		vel.y = romu_mono_float(random_state);
+	}break;
 	}
 
+	vel *= 0.00001;
 
 
 

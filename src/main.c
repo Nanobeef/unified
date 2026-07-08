@@ -273,6 +273,57 @@ s32 main(void)
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
 	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(64));
+	if(0){
+
+		GraphicsDeviceBuffer big_buffer = create_graphics_device_buffer(device->device_heap, GiB(1), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		GraphicsCommandPool *command_pool = create_graphics_command_pool(main_arena, device->transfer_queue_family,1);
+		GraphicsDeviceQueue queue = device->transfer_queue_family->queues[0];
+		GraphicsFence fence = create_graphics_fence(device, false);
+		GraphicsCommandBuffer cb = command_pool->command_buffers[0];
+		u32 n = 1000;
+		begin_graphics_command_buffer(cb);
+		for(u32 i = 0; i < n; i++)
+		{
+			if(true)
+			{
+				vkCmdFillBuffer(cb.handle, big_buffer.handle, 0, big_buffer.size, i);
+			}
+			else
+			{
+				VkBufferCopy region = {
+					.srcOffset = 0,
+					.dstOffset = big_buffer.size / 2,
+					.size = big_buffer.size / 2,
+				};
+				vkCmdCopyBuffer(cb.handle, big_buffer.handle, big_buffer.handle, 1, &region);
+			}
+		}
+		end_graphics_command_buffer(cb);
+		VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		submit_command_buffers(queue, 0,0, 0,0, 1,&cb, &wait_stage, fence);
+		u64 time = get_time_ns();
+		wait_for_graphics_fence(fence);
+		time = get_time_ns() - time;
+		u64 size = big_buffer.size;
+		f64 rate = ((f64)size / (f64)GiB(1)) / ((f64)time / 1000000000.0);
+		print(
+			"Big Buffer Fill:\n"
+			"Time = %tns\n"
+			"Size = %u64 GiB\n"
+			"Rate = %f64 Gib/sec\n"
+			"Samples = %u32\n",
+			time,
+			size / (GiB(1)),
+			rate * (f64)n,
+			n);
+
+		
+
+		destroy_graphics_fence(fence);
+		destroy_graphics_device_buffer(big_buffer);
+	}
+
+
 
 
 	RasterizationPipelines rasterization_pipelines = create_rasterization_pipelines(device, sample_count, target_format, target_format == swapchain.format, boid_sim.descriptor_set_layout.handle);
@@ -435,7 +486,6 @@ s32 main(void)
 		
 		last_frame_index = frame_index;
 		frame_index = frame_accum % frame_count;
-		boid_sim.buffer_index = frame_accum % 2;
 		frame_arena = frame_arenas[frame_accum % (frame_count * 2)];
 		reset_arena(frame_arena);
 
@@ -638,7 +688,7 @@ s32 main(void)
 					pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
 					for(u32 i = 0; i < USED(results); i++)
 					{
-						str = str8_print(scratch.arena, " %s \t%t\n",results[i].name, results[i].elapsed);
+						str = str8_print(scratch.arena, " %s \t%tus\n",results[i].name, results[i].elapsed);
 						pen = draw_str8_wrap(vb, fixed_camera, pen, window->size.x, str, text_pt, f32x4_color_white);
 						if(str8_equal(results[i].name, str8_lit("Draw World")))
 							draw_time += results[i].elapsed;
@@ -683,6 +733,7 @@ s32 main(void)
 
 
 			{
+				boid_sim.buffer_index = (boid_sim.buffer_index + 1) % 2;
 				vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.layout, 0, 1, &boid_sim.descriptor_sets[boid_sim.buffer_index].handle, 0,0);
 			}
 
@@ -703,12 +754,32 @@ s32 main(void)
 
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
 			if(pe.r.pressed || frame_accum == 0)
 			{
 				
-				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.reset);
-				vkCmdDispatch(cb.handle, KiB(64), 1,1);
-				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				u32 kernel_index = 0;
+				if(frame_accum == 0)
+				{
+					kernel_index = 1;
+				}
+				if(pe.n1.pressed)
+				{
+					kernel_index = 1;
+				}
+				if(pe.n2.pressed)
+				{
+					kernel_index = 2;
+				}
+				
+				if(kernel_index)
+				{
+					kernel_index--;
+					vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, offsetof(BoidComputePushConstants, kernel_index), sizeof(u32), &kernel_index);
+					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.reset);
+					vkCmdDispatch(cb.handle, KiB(64), 1,1);
+					cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				}
 			}
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			{
@@ -810,10 +881,27 @@ s32 main(void)
 				}
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Prefix"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Fill"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+				for(u32 i = 0;  i < 1; i++)
+				{
+					
+					String8 name = str8_print(frame_arena,"  Fill %u32", i);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+					vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.fill);
+					vkCmdPushConstants(cb.handle, boid_sim.pipelines.layout, boid_compute_push_stages, offsetof(BoidComputePushConstants, kernel_index), sizeof(u32), &i);
+					cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+					vkCmdDispatch(cb.handle, boid_sim.boid_count / 1024, 1,1);
+					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], name, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
+				}
+				boid_sim.buffer_index = (boid_sim.buffer_index + 1) % 2;
+				vkCmdBindDescriptorSets(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.layout, 0, 1, &boid_sim.descriptor_sets[boid_sim.buffer_index].handle, 0,0);
+				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Fill"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Res"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 				vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, boid_sim.pipelines.resolve);
 				cmd_general_memory_barrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-				vkCmdDispatch(cb.handle, KiB(64), 1,1);
+				vkCmdDispatch(cb.handle, boid_sim.boid_count / 256, 1,1);
 				cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Res"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			}
 
@@ -901,7 +989,7 @@ s32 main(void)
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
-					{
+					if(1){
 						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_grid_overlay);
 						device->vkCmdDrawMeshTasksEXT(cb.handle, 1, 1, 1);
 					}

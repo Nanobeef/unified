@@ -8,6 +8,13 @@ layout(location = 0) out vec4 out_color;
 layout(push_constant) uniform PushConstant{
 	mat3 affine;
 	float scale;
+	uint boid_count;
+	uint padding;
+	uint kernel_index;
+	uint src_index;
+	uint dst_index;
+	uvec2 grid_size;
+	uvec2 pixel_size;
 }PC;
 
 vec2 transform_position(vec2 v)
@@ -37,7 +44,7 @@ void main()
 	vec2 p = vertices[gl_VertexIndex % 3];
 
 	p += center;
-	p *= PC.scale * 0.00001;
+	p *= PC.scale * 0.0001;
 
 	p *= mat2(
 		-u.y, -u.x,
@@ -50,4 +57,5 @@ void main()
 	gl_Position = vec4(p, 1.0, 1.0);
 
 	out_color = colors[gl_VertexIndex % 3];
+//	out_color = vec4(1.0, vec2(float(gl_InstanceIndex) / (PC.boid_count)), 1.0);
 }

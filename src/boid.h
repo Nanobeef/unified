@@ -54,9 +54,10 @@ typedef struct{
 	struct{
 		VkPipelineLayout layout;
 		VkPipeline reset;
-		VkPipeline resolve;
 		VkPipeline count;
 		VkPipeline prefix_sum;
+		VkPipeline fill;
+		VkPipeline resolve;
 	}pipelines;
 
 }BoidGPUSimulation;

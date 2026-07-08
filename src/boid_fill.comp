@@ -1,0 +1,30 @@
+
+
+#version 460
+
+#include "boid_comp.h"
+
+layout (local_size_x = 1024) in;
+
+
+
+void move_boid(uint boid_index)
+{
+	GridIndex gi = grid_indices.data[boid_index];
+	uint offset = grid_offsets.data[gi.offset_index] + gi.index_in_cell;
+	writeonly_boids.data[offset] = readonly_boids.data[boid_index];
+}
+
+void main()
+{
+	uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
+	uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
+	uint WORK_GROUP = gl_WorkGroupID.x;
+	uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
+	uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
+	uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
+	if(GLOBAL_INVOCATION >= PC.boid_count)
+		return;
+
+		move_boid(GLOBAL_INVOCATION);
+}
