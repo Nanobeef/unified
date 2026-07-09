@@ -15,17 +15,29 @@ vec2 lerp(vec2 a, vec2 b, float t)
 	return (b-a) * t + a;
 }
 
-vec4 average_boid_within_radius(Boid src, float radius)
+struct BoidAvg{
+	vec2 pos[3];
+	vec2 vel[3];
+	u32 count[3];
+};
+
+BoidAvg average_boid_within_radius(Boid src, float radius[3])
 {
-	vec4 avg = vec4(0.0);
-	u32 total = 0;
+	BoidAvg avg = BoidAvg(
+		vec2[3](src.position, src.position, src.position),
+		vec2[3](src.velocity, src.velocity, src.velocity),
+		u32[3](1,1,1)
+	);
+	float max_radius = max(max(radius[0], radius[1]), radius[2]);
 
 	vec2 pos = src.position;
 	uvec2 a,b;
 	{
 		vec2 p = (pos + 1.0) / 2;
-		a = uvec2(floor((p - radius) * vec2(PC.grid_size)));
-		b = uvec2(floor((p + radius) * vec2(PC.grid_size)));
+		vec2 fa = mod(p-max_radius, 1.0);
+		vec2 fb = mod(p+max_radius, 1.0);
+		a = uvec2(floor(fa * vec2(PC.grid_size)));
+		b = uvec2(ceil(fb * vec2(PC.grid_size)));
 	}
 
 	for(u32 gx = a.x; gx < b.x; gx++)
@@ -40,18 +52,28 @@ vec4 average_boid_within_radius(Boid src, float radius)
 			for(u32 i = 0; i < c; i++)
 			{
 				Boid b = readonly_boids.data[offset + i];
-				if(distance(b.position, src.position) < radius)
+				for(u32 j = 0; j < 3; j++)
 				{
-					avg += vec4(b.position, b.velocity);
-					total += c;
+					float yes = float(distance(b.position, src.position) < radius[j]);
+					{
+						avg.pos[j] += b.position * yes;
+						avg.vel[j] += b.velocity * yes;
+						avg.count[j] += uint(yes);
+					}
 				}
 			}
 		}
 	}
+	for(uint i = 0; i < 3; i++)
 	{
-		return avg / float(total);
+		avg.pos[i] /= float(avg.count[i]);
+		avg.vel[i] /= float(avg.count[i]);
 	}
+	return avg;
 }
+
+
+#define PI 3.14159268
 
 void resolve_boid(uint index)
 {
@@ -64,13 +86,55 @@ void resolve_boid(uint index)
 	vec2 pos = b.position;
 	vec2 vel = b.velocity;
 
-	vec4 avg = average_boid_within_radius(b, cell_size.x);
-	vel = lerp(vel, avg.ba, 0.5);
+	float desired_speed = 0.00002;
+	float acceleration_factor = 0.01;
 
-	float speed = length(vel);
-	speed = lerp(speed, 0.0001, 0.1);
-	vel = normalize(vel) * speed;
+	float scale = PC.scale;
 
+	float seperation_strength = 0.01;
+	float cohesion_strength = 0.001;
+	float alignment_strength = 0.1;
+
+	float seperation_radius = cell_size.x * 1.0 * scale;
+	float cohesion_radius = cell_size.x * 1.0 * scale;
+	float alignment_radius = cell_size.x * 1.0 * scale;
+
+	vec2 acc = vec2(0.0);
+
+	BoidAvg avg = average_boid_within_radius(b, float[3](seperation_radius, cohesion_radius, alignment_radius));
+
+	if(true){
+		float speed = length(vel);
+
+		vec2 repel = avg.pos[0] - pos;
+		float repel_distance = length(repel);
+		float r =  repel_distance / seperation_radius;
+		acc -= repel * seperation_strength;
+	}
+	if(true){
+		float speed = length(vel);
+
+		vec2 repel = avg.pos[1] - pos;
+		float repel_distance = length(repel);
+		float r =  repel_distance / cohesion_radius;
+		acc += repel * cohesion_strength;
+	}
+	if(true){
+		vec2 avg_vel = avg.vel[2];
+		acc += lerp(vel, avg_vel, alignment_strength) - vel;
+	}
+
+
+
+	if(true)
+	{
+		float speed = length(vel);
+		float d = desired_speed - speed;
+		speed += d * acceleration_factor;
+		vel = normalize(vel) * speed;
+	}
+
+	vel += acc;
 	pos += vel;
 
 

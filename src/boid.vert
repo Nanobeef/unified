@@ -44,7 +44,7 @@ void main()
 	vec2 p = vertices[gl_VertexIndex % 3];
 
 	p += center;
-	p *= PC.scale * 0.0001;
+	p *= PC.scale * 0.0002;
 
 	p *= mat2(
 		-u.y, -u.x,

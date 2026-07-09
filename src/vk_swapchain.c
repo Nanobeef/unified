@@ -100,6 +100,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 			chosen_present_mode = present_modes[i];	
 		}
 	}
+	chosen_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
 	regress_scratch(scratch);
 

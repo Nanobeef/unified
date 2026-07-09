@@ -272,7 +272,7 @@ s32 main(void)
 	VkImageFormatProperties target_format_properties;
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
-	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(64));
+	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(16));
 	if(0){
 
 		GraphicsDeviceBuffer big_buffer = create_graphics_device_buffer(device->device_heap, GiB(1), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -998,21 +998,21 @@ s32 main(void)
 						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
 						// vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
 					}
-					if(true)
+					if(0)
 					{
-					if(pe.t.pressed == false)
-					{
-						u64 offset = 0;
-						vkCmdBindVertexBuffers(cb.handle, 0, 1, &boid_sim.boid_buffers[boid_sim.buffer_index].handle, &offset);
-						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid);
-						vkCmdDraw(cb.handle, 3, boid_sim.boid_count, 0,0);
-					}
-					else
-					{
-						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_mesh);
-						u32 count = boid_sim.boid_count / (1024 * 4 * 64);
-						device->vkCmdDrawMeshTasksEXT(cb.handle, count, 1, 1);
-					}
+						if(pe.t.pressed == false)
+						{
+							u64 offset = 0;
+							vkCmdBindVertexBuffers(cb.handle, 0, 1, &boid_sim.boid_buffers[boid_sim.buffer_index].handle, &offset);
+							vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid);
+							vkCmdDraw(cb.handle, 3, boid_sim.boid_count, 0,0);
+						}
+						else
+						{
+							vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_mesh);
+							u32 count = boid_sim.boid_count / (1024 * 4 * 64);
+							device->vkCmdDrawMeshTasksEXT(cb.handle, count, 1, 1);
+						}
 					}
 
 
