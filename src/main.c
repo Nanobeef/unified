@@ -721,14 +721,12 @@ s32 main(void)
 		}
 		tidings.cb_wait_time = record_time();
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
-		{
-			GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 
-			cmd_reset_graphics_query_pool(cb, timestamp_query_pools[frame_index]);
-			cmd_reset_graphics_query_pool(cb, invocation_query_pools[frame_index]);
+		cmd_reset_graphics_query_pool(cb, timestamp_query_pools[frame_index]);
+		cmd_reset_graphics_query_pool(cb, invocation_query_pools[frame_index]);
+		if(1){
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Buffer"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-
-
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Boid "), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
 
@@ -755,7 +753,7 @@ s32 main(void)
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit(" Boid Reset"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 
-			if(pe.r.pressed || frame_accum == 0)
+			if(pe.r.pressed || (frame_accum == 0))
 			{
 				
 				u32 kernel_index = 0;
@@ -989,7 +987,21 @@ s32 main(void)
 					cmd_begin_graphics_query_name(cb, invocation_query_pools[frame_index], str8_lit("World"));
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Draw World"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
-					if(1){
+					static b32 should_draw_grid = false;
+					static u64 draw_grid_toggle_time = 0;
+					if(pe.g.released)
+						draw_grid_toggle_time = 0;
+					if(pe.g.pressed)
+					{
+						u64 time = get_time_ns();
+						if(time - draw_grid_toggle_time > 250000000)
+						{
+							should_draw_grid = !should_draw_grid;
+						}
+						draw_grid_toggle_time = time;
+					}
+
+					if(should_draw_grid){
 						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.boid_grid_overlay);
 						device->vkCmdDrawMeshTasksEXT(cb.handle, 1, 1, 1);
 					}
@@ -998,7 +1010,20 @@ s32 main(void)
 						vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_GRAPHICS, rasterization_pipelines.vertex2);
 						// vertex_data_size += cmd_draw_graphics_device_vertex_buffer(cb, world_vertex_buffers[frame_index]);
 					}
-					if(0)
+					static b32 should_draw_boids = true;
+					static u64 draw_boids_toggle_time = 0;
+					if(pe.d.released)
+						draw_boids_toggle_time = 0;
+					if(pe.d.pressed)
+					{
+						u64 time = get_time_ns();
+						if(time - draw_boids_toggle_time > 250000000)
+						{
+							should_draw_boids = !should_draw_boids;
+						}
+						draw_boids_toggle_time = time;
+					}
+					if(should_draw_boids)
 					{
 						if(pe.t.pressed == false)
 						{
@@ -1118,6 +1143,10 @@ s32 main(void)
 
 
 			}
+			}
+			else
+			{
+			}
 
 			if(target_format != swapchain.format)
 			{
@@ -1159,7 +1188,6 @@ s32 main(void)
 					cmd_graphics_pipeline_barrier(cb, barrier);
 					cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("BLIT"), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 				}
-			}
 
 			cmd_timestamp_graphics_query_name(cb, timestamp_query_pools[frame_index], str8_lit("Buffer"), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 			end_graphics_command_buffer(cb);

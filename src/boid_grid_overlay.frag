@@ -33,9 +33,6 @@ void main()
 		}
 	}
 
-
-
-
 	vec2 cell_size = 1.0 / PC.grid_size;
 	vec2 gmod = mod(in_position, cell_size);
 
@@ -63,8 +60,4 @@ void main()
 		vec4 color = counter_color * vec4(1.0);
 		out_color = vec4(d * color.rgb, 1.0);
 	}
-
-
-
-
 }

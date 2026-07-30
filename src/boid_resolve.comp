@@ -86,7 +86,7 @@ void resolve_boid(uint index)
 	vec2 pos = b.position;
 	vec2 vel = b.velocity;
 
-	float desired_speed = 0.00002;
+	float desired_speed = 0.00008;
 	float acceleration_factor = 0.01;
 
 	float scale = PC.scale;
