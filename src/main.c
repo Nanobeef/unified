@@ -115,6 +115,9 @@ u64 epoch_time_ns;
 	#include "pile.c"
 
  	#include "boid.c"
+	
+#include "font.h"
+#include "font.c"
 
 void init(void)
 {
@@ -215,9 +218,66 @@ void cmd_general_memory_barrier(GraphicsCommandBuffer cb, VkPipelineStageFlags s
 	vkCmdPipelineBarrier(cb.handle, src,dst, 0, 1, &barrier, 0,0,0,0);
 }
 
+
 s32 main(void)
 {
 	init();
+	font_test();
+	return 0;
+
+
+	u64 runs = 1000000;
+	{
+		u64 et = get_time_ns();
+		u32 m = 0;
+		u32 m_i = 0;
+		for(u64 i = 1; i < runs; i++)
+		{
+			u32 c = slow_collatz(i);
+			if(c > m)
+			{
+				m = c;
+				m_i = i;
+			}
+		}
+		et = get_time_ns() - et;
+		print("slow %u32 steps from %u32\ntook: %t\n", m , m_i, et);
+	}
+	{
+		u64 et = get_time_ns();
+		u32 m = 0;
+		u32 m_i = 0;
+		for(u64 i = 1; i < runs; i++)
+		{
+			u32 c = fast_collatz(i);
+			if(c > m)
+			{
+				m = c;
+				m_i = i;
+			}
+		}
+		et = get_time_ns() - et;
+		print("fast %u32 steps from %u32\ntook: %t\n", m , m_i, et);
+	}
+	{
+		u64 et = get_time_ns();
+		u32 m = 0;
+		u32 m_i = 0;
+		for(u64 i = 1; i < runs; i++)
+		{
+			u32 c = ultra_collatz(i);
+			if(c > m)
+			{
+				m = c;
+				m_i = i;
+			}
+		}
+		et = get_time_ns() - et;
+		print("ultr %u32 steps from %u32\ntook: %t\n", m , m_i, et);
+	}
+	return 0;
+
+
 	AudioDevice *audio_device = create_audio_device(main_arena);
 
 	tidings.startup_time = mark_time();
@@ -272,7 +332,7 @@ s32 main(void)
 	VkImageFormatProperties target_format_properties;
 	vkGetPhysicalDeviceImageFormatProperties(device->physical.handle, target_format, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &target_format_properties);
 	VkSampleCountFlags sample_count = most_significant_bit((u64)target_format_properties.sampleCounts);
-	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(16));
+	BoidGPUSimulation boid_sim = create_boid_gpu_simulation(main_arena, device, MiB(32));
 	if(0){
 
 		GraphicsDeviceBuffer big_buffer = create_graphics_device_buffer(device->device_heap, GiB(1), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
@@ -562,7 +622,6 @@ s32 main(void)
 		{
 			if(pe.last_time < pe.m.press_time)
 			{
-				print("%etns\n");
 				inspect_camera = init_camera();
 			}
 				update_camera(&inspect_camera, pe, window->size, false);

@@ -1,7 +1,4 @@
 
-
-
-
 typedef struct{
 	b32 msaa_enable;
 }Settings;

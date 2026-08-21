@@ -30,6 +30,10 @@
 #ifdef AVX512_CORE
 #endif
 
+typedef struct{
+	u16 x,y;
+}u16vec2;
+
 #include "u32x2.h"
 #include "s32x2.h"
 

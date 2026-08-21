@@ -102,6 +102,7 @@ typedef enum{
 
 	PRINT_KEYWORD_String8,
 	PRINT_KEYWORD_Cstring,
+	PRINT_KEYWORD_char,
 
 
 	PRINT_KEYWORD_Time,
@@ -150,6 +151,7 @@ PrintKeyword keywords[] = {
 	p1(u32x2),
 	p1(s32x2),
 	p1(f32x2),
+	p2(c, char),
 	p2(cs, Cstring),
 
 	p2(et, EpochTime),
@@ -243,6 +245,11 @@ u64 keyword_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, const void *da
 			dst[i] = d.data[i]; 
 		}
 		len = i;
+	}break;
+	case PRINT_KEYWORD_char:{
+		char d = *(char *)data;
+		*dst = d;
+		len = 1;
 	}break;
 	case PRINT_KEYWORD_Cstring:{
 		const char *d = *(const char **)data;
@@ -388,6 +395,10 @@ u64 variadic_scalar_to_buffer(u64 size, u8* dst, PrintKeywordIndex index, va_lis
 	}break;
 	case PRINT_KEYWORD_Cstring:{
 		const char* d = va_arg(l, const char*);
+		len = keyword_to_buffer(size, dst, index, &d);
+	}break;
+	case PRINT_KEYWORD_char:{
+		char d = va_arg(l, char); 
 		len = keyword_to_buffer(size, dst, index, &d);
 	}break;
 	case PRINT_KEYWORD_EpochTimeNS:{
