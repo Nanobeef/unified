@@ -1,0 +1,71 @@
+
+
+
+
+High Priority:
+	- Hash map for dyanmic timing variables, store running average of times.
+
+
+Low Priority:
+	- Can currently set main thread to be the highest indexed physical thread. Still need to check for Intel differing core types and set for highest "P" thread index.
+	- Array of affine matrices passed as a host-coherent uniform buffer, use push constants for index.
+	- Query pool results need to wait for frame completion. 
+
+
+
+Pile
+
+Build System
+
+Text Editor
+
+Boid Game
+
+
+typedef struct{
+	Window *window;
+	GraphicsInstance *instance;
+	GraphicsDevice *device;
+	GraphicsSurface surface;
+	GraphicsSwapchain swapchain;
+
+
+	b32 window_is_alive;
+	b32 instance_is_alive;
+	b32 device_is_alive;
+	b32 surface_is_alive;
+	b32 swapchain_is_alive;
+	b32 pipeline_state_is_alive;
+	b32 texture_state_is_alive;
+		b32 frame_resources_are_alive;
+
+	b32 audio_device_is_alive;
+		b32 audio_resources_are_alive;
+}LifetimeState;
+
+
+
+
+
+CreateAll(...)
+DestroyAll(...)
+
+	CreateWindowLifetime(...);
+
+	CreateInstanceLifetime(...);
+
+	CreateSurfaceLifetime(...);
+
+	CreateDeviceLieftime(...);
+
+	CreateSwapchainLifetime(...);
+
+	CreateFrameRecourcesLifetime(...);
+
+BeginRenderLoop(...);
+
+	CreateAudioLifetime(...);
+
+BeginAudioLoop(...);
+
+

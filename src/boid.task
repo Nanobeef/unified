@@ -1,0 +1,37 @@
+#version 460
+
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 1) in;
+
+layout(push_constant) uniform PushConstant{
+	mat3 affine;
+	float scale;
+	uint boid_count;
+	uint random_seed;	
+}PC;
+
+struct TaskPayload
+{
+	uint offset;
+};
+
+taskPayloadSharedEXT TaskPayload payload;
+
+void main()
+{
+	uint task_id = gl_WorkGroupID.x;
+	const uint mesh_per_task = 1024 * 4;
+	uint base = task_id * mesh_per_task * 64;
+
+	if(gl_LocalInvocationID.x == 0)
+	{
+		uint remaining = (base < PC.boid_count) ? PC.boid_count - base : 0;
+		uint to_emit = min(mesh_per_task, (remaining + 63) / 64);
+		payload.offset = base;
+		EmitMeshTasksEXT(to_emit, 1,1);
+	}
+
+
+
+}

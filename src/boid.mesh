@@ -1,0 +1,70 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+#include "boid_comp.h"
+
+layout(local_size_x = 64) in;
+layout(max_vertices = 192, max_primitives = 64) out;
+layout(triangles) out;
+
+layout(location = 0) out vec4 out_color[];
+
+struct TaskPayload
+{
+	uint offset;
+};
+
+taskPayloadSharedEXT TaskPayload payload;
+
+const vec2 vertices[3] = {
+	vec2(0.0, -1.0),
+	vec2(-0.5, 1.0),
+	vec2(0.5, 1.0)
+};
+
+const vec4 colors[3] = {
+	vec4(1.0, 0.0, 0.0, 1.0),
+	vec4(0.0, 1.0, 0.0, 1.0),
+	vec4(0.0, 0.0, 1.0, 1.0)
+};
+const vec2 center = vec2(0.0, 0.25);
+
+
+void main()
+{
+	uint local_inv = gl_LocalInvocationIndex;
+	uint global_inv = payload.offset + gl_GlobalInvocationID.x;
+	if(global_inv > PC.boid_count)
+	{
+		for(uint i = 0; i < 3; i++)
+		{
+			uint vertex_index = local_inv * 3 + i;
+			gl_MeshVerticesEXT[vertex_index].gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+		}
+	}
+
+	SetMeshOutputsEXT(192,64);
+
+	Boid boid = readonly_boids.data[global_inv];
+
+	vec2 u = normalize(boid.velocity);
+	u.y = -u.y;
+	for(uint i = 0; i < 3; i++)
+	{
+		vec2 p = vertices[i];
+		p += center;
+		p *= PC.scale * 0.0001;
+
+		p *= mat2(u.y, -u.x, u.x, u.y);
+		
+		p += vec2(boid.position);
+		p = transform_position(p);
+
+
+		uint vertex_index = local_inv * 3 + i;
+		gl_MeshVerticesEXT[vertex_index].gl_Position = vec4(p, 1.0, 1.0);
+		out_color[vertex_index] = colors[i];
+		
+	}
+    gl_PrimitiveTriangleIndicesEXT[local_inv] = uvec3(0 + local_inv * 3, 1 + local_inv * 3, 2 + local_inv * 3);
+}

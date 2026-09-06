@@ -1,0 +1,211 @@
+#version 460
+
+#include "boid_comp.h"
+
+layout (local_size_x = 256) in;
+
+#define u32 uint
+
+vec4 lerp(vec4 a, vec4 b, float t)
+{
+	return (b-a) * t + a;
+}
+vec2 lerp(vec2 a, vec2 b, float t)
+{
+	return (b-a) * t + a;
+}
+
+struct BoidAvg{
+	vec2 pos[3];
+	vec2 vel[3];
+	u32 count[3];
+};
+
+BoidAvg average_boid_within_radius(Boid src, float radius[3])
+{
+	BoidAvg avg = BoidAvg(
+		vec2[3](src.position, src.position, src.position),
+		vec2[3](src.velocity, src.velocity, src.velocity),
+		u32[3](1,1,1)
+	);
+	float max_radius = max(max(radius[0], radius[1]), radius[2]);
+
+	vec2 pos = src.position;
+	uvec2 a,b;
+	{
+		vec2 p = (pos + 1.0) / 2;
+		vec2 fa = mod(p-max_radius, 1.0);
+		vec2 fb = mod(p+max_radius, 1.0);
+		a = uvec2(floor(fa * vec2(PC.grid_size)));
+		b = uvec2(ceil(fb * vec2(PC.grid_size)));
+	}
+
+	for(u32 gx = a.x; gx < b.x; gx++)
+	{
+		for(u32 gy = a.y; gy < b.y; gy++)
+		{
+			u32 x = gx % PC.grid_size.x;
+			u32 y = gy % PC.grid_size.y;
+			u32 cell_index = x + PC.grid_size.x * y;
+			u32 c = grid_counters.data[cell_index];
+			u32 offset = grid_offsets.data[cell_index];
+			for(u32 i = 0; i < c; i++)
+			{
+				Boid b = readonly_boids.data[offset + i];
+				for(u32 j = 0; j < 3; j++)
+				{
+					float yes = float(distance(b.position, src.position) < radius[j]);
+					{
+						avg.pos[j] += b.position * yes;
+						avg.vel[j] += b.velocity * yes;
+						avg.count[j] += uint(yes);
+					}
+				}
+			}
+		}
+	}
+	for(uint i = 0; i < 3; i++)
+	{
+		avg.pos[i] /= float(avg.count[i]);
+		avg.vel[i] /= float(avg.count[i]);
+	}
+	return avg;
+}
+
+
+#define PI 3.14159268
+
+void resolve_boid(uint index)
+{
+	Boid b = readonly_boids.data[index];
+	uint state = index;
+
+	vec2 cell_size = 1.0 / vec2(PC.grid_size);
+
+
+	vec2 pos = b.position;
+	vec2 vel = b.velocity;
+
+	float desired_speed = 0.00008;
+	float acceleration_factor = 0.01;
+
+	float scale = PC.scale;
+
+	float seperation_strength = 0.01;
+	float cohesion_strength = 0.001;
+	float alignment_strength = 0.1;
+
+	float seperation_radius = cell_size.x * 1.0 * scale;
+	float cohesion_radius = cell_size.x * 1.0 * scale;
+	float alignment_radius = cell_size.x * 1.0 * scale;
+
+	vec2 acc = vec2(0.0);
+
+	BoidAvg avg = average_boid_within_radius(b, float[3](seperation_radius, cohesion_radius, alignment_radius));
+
+	if(true){
+		float speed = length(vel);
+
+		vec2 repel = avg.pos[0] - pos;
+		float repel_distance = length(repel);
+		float r =  repel_distance / seperation_radius;
+		acc -= repel * seperation_strength;
+	}
+	if(true){
+		float speed = length(vel);
+
+		vec2 repel = avg.pos[1] - pos;
+		float repel_distance = length(repel);
+		float r =  repel_distance / cohesion_radius;
+		acc += repel * cohesion_strength;
+	}
+	if(true){
+		vec2 avg_vel = avg.vel[2];
+		acc += lerp(vel, avg_vel, alignment_strength) - vel;
+	}
+
+
+
+	if(true)
+	{
+		float speed = length(vel);
+		float d = desired_speed - speed;
+		speed += d * acceleration_factor;
+		vel = normalize(vel) * speed;
+	}
+
+	vel += acc;
+	pos += vel;
+
+
+
+
+	if(pos.x > 1.0)
+		pos.x -= 2.0;
+
+	if(pos.x < -1.0)
+		pos.x += 2.0;
+
+	if(pos.y > 1.0)
+		pos.y -= 2.0;
+
+	if(pos.y < -1.0)
+		pos.y += 2.0;
+	
+
+	b.position = pos;
+	b.velocity = vel;
+	writeonly_boids.data[index] = b;
+}
+
+void main()
+{
+	if(gl_WorkGroupSize.x <= 64) // # 3
+	{
+		uint GLOBAL_INVOCATION = gl_GlobalInvocationID.x;
+		uint LOCAL_INVOCATION = gl_LocalInvocationID.x;
+		uint WORK_GROUP = gl_WorkGroupID.x;
+		uint WORK_GROUP_SIZE = gl_WorkGroupSize.x;
+		uint WORK_GROUP_COUNT = gl_NumWorkGroups.x;
+		uint INVOCATION_COUNT = WORK_GROUP_COUNT * WORK_GROUP_SIZE;
+
+		for(uint i = GLOBAL_INVOCATION; i < PC.boid_count; i += INVOCATION_COUNT)
+		{
+			resolve_boid(i);
+		}
+	}
+	else if(true) // # 1 fastest
+	{
+		uint lane          = gl_SubgroupInvocationID;
+		uint wave_size     = gl_SubgroupSize;
+		uint waves_per_wg  = gl_WorkGroupSize.x / wave_size;
+		uint wave_id       = gl_WorkGroupID.x * waves_per_wg + gl_SubgroupID;
+		uint num_waves     = gl_NumWorkGroups.x * waves_per_wg;
+
+		uint section_size  = (PC.boid_count + num_waves - 1) / num_waves;  // ← fixed
+		uint section_start = wave_id * section_size;
+
+		for(uint i = lane; i < section_size; i += wave_size)
+		{
+			uint idx = section_start + i;
+			if(idx < PC.boid_count)
+				resolve_boid(idx);
+		}
+	}
+	else // # 2
+	{
+		uint local_id  = gl_LocalInvocationID.x;
+		uint wg_size   = gl_WorkGroupSize.x;
+		uint wg_id     = gl_WorkGroupID.x;
+		uint num_wgs   = gl_NumWorkGroups.x;
+
+		uint elements_per_wg = (PC.boid_count + num_wgs - 1) / num_wgs;
+		uint tile_start      = wg_id * elements_per_wg;
+		uint tile_end        = min(tile_start + elements_per_wg, PC.boid_count);
+
+		for(uint i = tile_start + local_id; i < tile_end; i += wg_size)
+		{
+			resolve_boid(i);
+		}
+	}
+}

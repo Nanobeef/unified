@@ -1,0 +1,666 @@
+
+
+VkShaderModule read_shader_file(GraphicsDevice *device, const char *name)
+{
+	Scratch scratch = find_scratch(0,0,0);
+	s32 fd = open(name, O_RDONLY);
+	if(fd == -1)
+	{
+		print("Failed to open shader: %cs\n", name);
+		return 0;
+	}
+	struct stat st;
+	if(fstat(fd, &st) == -1)
+	{
+		print("Failed to get shader size: %cs\n", name);
+		return 0;
+	}
+
+	u64 size = st.st_size;
+	u32 *code = arena_push(scratch.arena, 0, size);
+	
+	u64 read_size = read(fd, code, size);
+	if(read_size != size)
+	{
+		print("Incorrect shader read size: %cs\n", name);
+		return 0;
+	}
+
+	VkShaderModuleCreateInfo info = {
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.pCode = code,
+		.codeSize = size,
+	};
+	VkShaderModule module = 0;
+	VK_ASSERT(vkCreateShaderModule(device->handle, &info, vkb, &module));
+	regress_scratch(scratch);
+	return module;
+}
+
+
+
+RasterizationPipelines create_rasterization_pipelines(GraphicsDevice *device, VkSampleCountFlags sample_count, VkFormat format, b32 direct_to_swapchain, VkDescriptorSetLayout boid_descriptor_set_layout)
+{
+	RasterizationPipelines rast = 	{
+		.device = device,
+		.format = format,
+		.sample_count = sample_count
+	};
+	{
+		VkSamplerCreateInfo info = {
+			.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.magFilter = VK_FILTER_NEAREST,
+			.minFilter = VK_FILTER_NEAREST,
+			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+			.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+			.mipLodBias = 0.0f,
+			.anisotropyEnable = VK_FALSE,
+			.maxAnisotropy = 1.0f,
+			.compareEnable = VK_FALSE,
+			.compareOp = VK_COMPARE_OP_LESS,
+			.minLod = 0.0f,
+			.maxLod = 0.0f,
+			.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+			.unnormalizedCoordinates = VK_TRUE,
+		};
+		VK_ASSERT(vkCreateSampler(device->handle, &info, vkb, &rast.mono_sampler));
+		info.unnormalizedCoordinates = VK_FALSE;
+		VK_ASSERT(vkCreateSampler(device->handle, &info, vkb, &rast.inspect_sampler));
+	}
+	VkImageLayout final_image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	VkImageLayout final_image_access = VK_ACCESS_TRANSFER_READ_BIT;
+	VkImageLayout final_image_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	if(direct_to_swapchain)
+	{
+		final_image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		final_image_access = VK_ACCESS_NONE;
+		final_image_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
+	if(rast.sample_count == VK_SAMPLE_COUNT_1_BIT){
+		VkAttachmentReference color_reference = {
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
+		VkAttachmentDescription attachments[] = {
+			{
+				.format = rast.format,
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = final_image_layout,
+			},
+		};
+
+		VkSubpassDescription subpasses[] = {
+			{
+				.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &color_reference,
+			},
+		};
+
+		VkSubpassDependency dependencies[] = {
+			{
+				.srcSubpass = 0,
+				.dstSubpass = VK_SUBPASS_EXTERNAL,
+				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask = final_image_stage,
+				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+				.dstAccessMask = final_image_access,
+				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+			},
+		};
+
+		VkRenderPassCreateInfo info = {
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.attachmentCount = Arrlen(attachments),
+			.pAttachments = attachments,
+			.subpassCount = Arrlen(subpasses),
+			.pSubpasses = subpasses,
+			.dependencyCount = Arrlen(dependencies),
+			.pDependencies = dependencies,
+
+		};
+
+		VK_ASSERT(vkCreateRenderPass(device->handle, &info, vkb, &rast.render_pass));
+	}
+	else
+	{
+		VkAttachmentReference color_reference = {
+			.attachment = 0,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+		VkAttachmentReference resolve_reference = {
+			.attachment = 1,
+			.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
+		VkAttachmentDescription attachments[] = {
+			{
+				.format = rast.format,
+				.samples = rast.sample_count,
+				.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+				.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			},
+			{
+				.format = rast.format,
+				.samples = VK_SAMPLE_COUNT_1_BIT,
+				.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+				.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+				.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.finalLayout = final_image_layout,
+			},
+		};
+
+		VkSubpassDescription subpasses[] = {
+			{
+				.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+				.colorAttachmentCount = 1,
+				.pColorAttachments = &color_reference,
+				.pResolveAttachments = &resolve_reference,
+			},
+		};
+
+		VkSubpassDependency dependencies[] = {
+			{
+				.srcSubpass = 0,
+				.dstSubpass = VK_SUBPASS_EXTERNAL,
+				.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				.dstStageMask = final_image_stage,
+				.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+				.dstAccessMask = final_image_access,
+				.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+			},
+		};
+
+		VkRenderPassCreateInfo info = {
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.attachmentCount = Arrlen(attachments),
+			.pAttachments = attachments,
+			.subpassCount = Arrlen(subpasses),
+			.pSubpasses = subpasses,
+			.dependencyCount = Arrlen(dependencies),
+			.pDependencies = dependencies,
+
+		};
+		VK_ASSERT(vkCreateRenderPass(device->handle, &info, vkb, &rast.render_pass));
+	}
+	{
+		VkPushConstantRange ranges[] = {
+			{
+				.size = sizeof(BoidComputePushConstants),
+				.stageFlags = boid_compute_push_stages,
+			},
+		};
+		u32 push_offset = 0;
+		for(u32 i = 0; i < Arrlen(ranges); i++)
+		{
+			ranges[i].offset = push_offset;
+			push_offset += ranges[i].size;
+		}
+
+		VkDescriptorSetLayoutBinding bindings[] = {
+			{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &rast.mono_sampler},
+			{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &rast.inspect_sampler},
+		};
+		rast.descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
+		VkDescriptorSetLayout set_layouts[] = {
+			boid_descriptor_set_layout,
+			rast.descriptor_set_layout.handle,
+		};
+
+		VkPipelineLayoutCreateInfo info = {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pushConstantRangeCount = Arrlen(ranges),
+			.pPushConstantRanges = ranges,
+			.setLayoutCount = 2,
+			.pSetLayouts = set_layouts,
+		};
+		VK_ASSERT(vkCreatePipelineLayout(device->handle, &info, vkb, &rast.layout));
+	}
+
+	VkShaderModule vertex2_vert_module = read_shader_file(device, "build/vertex2_vert.spv");
+	VkShaderModule vertex2_frag_module = read_shader_file(device, "build//vertex2_frag.spv");
+
+	VkPipelineShaderStageCreateInfo vertex2_vertex_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = vertex2_vert_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo vertex2_fragment_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = vertex2_frag_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo vertex2_stages[] = {
+		vertex2_vertex_stage,
+		vertex2_fragment_stage,
+	};
+
+	VkVertexInputBindingDescription vertex2_bindings[] = {
+		{
+			.binding = 0,
+			.stride = sizeof(Vertex2),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		},
+	};
+
+	VkVertexInputAttributeDescription vertex2_attributes[] = {
+		{
+			.binding = 0,
+			.location = 0,
+			.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+			.offset = offsetof(Vertex2, color),
+		},
+		{
+			.binding = 0,
+			.location = 1,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex2, position),
+		},
+		{
+			.binding = 0,
+			.location = 2,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex2, texture),
+		},
+	};
+
+	VkPipelineVertexInputStateCreateInfo vertex2_input_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,	
+		.vertexBindingDescriptionCount = Arrlen(vertex2_bindings),
+		.pVertexBindingDescriptions = vertex2_bindings,
+		.vertexAttributeDescriptionCount = Arrlen(vertex2_attributes),
+		.pVertexAttributeDescriptions = vertex2_attributes,
+	};
+
+	VkShaderModule boid_vert_module = read_shader_file(device, "build/boid_vert.spv");
+	VkShaderModule boid_mesh_module = read_shader_file(device, "build/boid_mesh.spv");
+	VkShaderModule boid_task_module = read_shader_file(device, "build/boid_task.spv");
+	VkShaderModule boid_frag_module = read_shader_file(device, "build/boid_frag.spv");
+
+	VkShaderModule boid_grid_overlay_mesh_module = read_shader_file(device, "build/boid_grid_overlay_mesh.spv");
+	VkShaderModule boid_grid_overlay_frag_module = read_shader_file(device, "build/boid_grid_overlay_frag.spv");
+
+	VkPipelineShaderStageCreateInfo boid_vertex_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = boid_vert_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_fragment_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = boid_frag_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_mesh_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+		.module = boid_mesh_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_task_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_TASK_BIT_EXT,
+		.module = boid_task_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_mesh_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+		.module = boid_grid_overlay_mesh_module,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_frag_stage = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = boid_grid_overlay_frag_module,
+		.pName = "main",
+	};
+
+
+	VkPipelineShaderStageCreateInfo boid_stages[] = {
+		boid_vertex_stage,
+		boid_fragment_stage,
+	};
+
+	VkPipelineShaderStageCreateInfo boid_mesh_stages[] = {
+		boid_task_stage,
+		boid_mesh_stage,
+		boid_fragment_stage,
+	};
+
+	VkPipelineShaderStageCreateInfo boid_grid_overlay_stages[] = {
+		boid_grid_overlay_mesh_stage,
+		boid_grid_overlay_frag_stage,
+	};
+
+	VkVertexInputBindingDescription boid_bindings[] = {
+		{
+			.binding = 0,
+			.stride = sizeof(Boid),
+			.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
+		},
+	};
+
+	VkVertexInputAttributeDescription boid_attributes[] = {
+		{
+			.binding = 0,
+			.location = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Boid, position),
+		},
+		{
+			.binding = 0,
+			.location = 1,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Boid, velocity),
+		},
+	};
+
+	VkPipelineVertexInputStateCreateInfo boid_input_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,	
+		.vertexBindingDescriptionCount = Arrlen(boid_bindings),
+		.pVertexBindingDescriptions = boid_bindings,
+		.vertexAttributeDescriptionCount = Arrlen(boid_attributes),
+		.pVertexAttributeDescriptions = boid_attributes,
+	};
+
+	VkPipelineInputAssemblyStateCreateInfo point_list_input_assembly_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,	
+		.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
+		.primitiveRestartEnable = VK_FALSE,
+	};
+
+	VkPipelineInputAssemblyStateCreateInfo line_list_input_assembly_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,	
+		.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
+		.primitiveRestartEnable = VK_FALSE,
+	};
+
+	VkPipelineInputAssemblyStateCreateInfo triangle_list_input_assembly_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,	
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = VK_FALSE,
+	};
+
+	VkPipelineTessellationStateCreateInfo tessellation_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+		.patchControlPoints = 32,
+	};
+
+	VkViewport viewport = {
+		.x = 0.00,	
+		.y = 0.0,
+		.width = 1000.0,
+		.height = 1000.0,
+		.minDepth = 0.0,
+		.maxDepth = 1.0,
+	};
+
+	VkRect2D scissor = {
+		.offset = (VkOffset2D){0,0},
+		.extent = (VkExtent2D){0,0},
+	};
+
+	VkPipelineViewportStateCreateInfo viewport_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.pViewports = &viewport,
+		.scissorCount = 1,
+		.pScissors = &scissor,
+	};
+
+	VkPipelineRasterizationStateCreateInfo rasterization_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.frontFace = VK_FRONT_FACE_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 1.0f,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = 1.0f,
+		.lineWidth = 1.0f,
+	};
+
+	VkPipelineRasterizationStateCreateInfo line_rasterization_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_LINE,
+		.frontFace = VK_FRONT_FACE_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 1.0f,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = 1.0f,
+		.lineWidth = 1.0f,
+	};
+
+	VkSampleMask sample_mask = 0xFFFFFFFF;
+
+	VkPipelineMultisampleStateCreateInfo multisample_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.rasterizationSamples = sample_count,
+		.sampleShadingEnable = VK_FALSE,
+		.minSampleShading = 0.0f,
+		.pSampleMask = NULL,
+		.alphaToCoverageEnable = VK_FALSE,
+		.alphaToOneEnable = VK_FALSE,
+	};
+
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_FALSE,
+		.depthWriteEnable = VK_FALSE,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = VK_FALSE,
+		.stencilTestEnable = VK_FALSE,
+		.front = (VkStencilOpState){0},
+		.back = (VkStencilOpState){0},
+		.minDepthBounds = 0.0f,
+		.maxDepthBounds = 1.0f,
+	};
+	
+	VkPipelineColorBlendAttachmentState color_blend_attachments[] = {
+		{
+			.blendEnable = VK_TRUE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,  
+		},
+	};
+
+	VkPipelineColorBlendStateCreateInfo color_blend_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_SET,
+		.attachmentCount = Arrlen(color_blend_attachments),
+		.pAttachments = color_blend_attachments,
+		.blendConstants[0] = 0.0f,
+		.blendConstants[1] = 0.0f,
+		.blendConstants[2] = 0.0f,
+		.blendConstants[3] = 0.0f,
+	};
+
+	VkPipelineColorBlendAttachmentState no_blend_attachments[] = {
+		{
+			.blendEnable = VK_FALSE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,  
+		},
+	};
+
+	VkPipelineColorBlendStateCreateInfo no_color_blend_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_SET,
+		.attachmentCount = Arrlen(no_blend_attachments),
+		.pAttachments = no_blend_attachments,
+		.blendConstants[0] = 0.0f,
+		.blendConstants[1] = 0.0f,
+		.blendConstants[2] = 0.0f,
+		.blendConstants[3] = 0.0f,
+	};
+	
+	VkDynamicState dynamic_states[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamic_state = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = Arrlen(dynamic_states),
+		.pDynamicStates = dynamic_states,
+	};
+
+	VkGraphicsPipelineCreateInfo info = {
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.stageCount = Arrlen(vertex2_stages),
+		.pStages = vertex2_stages,
+		.pVertexInputState = &vertex2_input_state,
+		.pInputAssemblyState = &triangle_list_input_assembly_state,
+		.pTessellationState = &tessellation_state,
+		.pViewportState = &viewport_state,
+		.pRasterizationState = &rasterization_state,
+		.pMultisampleState = &multisample_state,
+		.pDepthStencilState = &depth_stencil_state,
+		.pColorBlendState = &color_blend_state,
+		.pDynamicState = &dynamic_state,
+		.renderPass = rast.render_pass,
+		.subpass = 0,
+		.layout = rast.layout,
+	};
+	VkGraphicsPipelineCreateInfo infos[5];
+	for(u32 i = 0; i < Arrlen(infos); i++) {infos[i] = info;};
+
+	infos[1].pRasterizationState = &line_rasterization_state;
+
+	infos[2].stageCount = Arrlen(boid_stages),
+	infos[2].pStages = boid_stages;
+	infos[2].pVertexInputState = &boid_input_state;
+
+	infos[3].stageCount = Arrlen(boid_mesh_stages);
+	infos[3].pStages = boid_mesh_stages;
+	infos[3].pVertexInputState = 0;
+	infos[3].pInputAssemblyState = 0;
+
+	infos[4] = infos[3];
+	infos[4].stageCount = Arrlen(boid_grid_overlay_stages);
+	infos[4].pStages = boid_grid_overlay_stages;
+
+	VkPipeline pipelines[3];
+	VK_ASSERT(vkCreateGraphicsPipelines(device->handle, 0, Arrlen(infos), infos, vkb, pipelines));
+	rast.vertex2 = pipelines[0];
+	rast.vertex2_wireframe = pipelines[1];
+	rast.boid = pipelines[2];
+	rast.boid_mesh = pipelines[3];
+	rast.boid_grid_overlay = pipelines[4];
+
+	vkDestroyShaderModule(device->handle, vertex2_vert_module, vkb);
+	vkDestroyShaderModule(device->handle, vertex2_frag_module, vkb);
+
+	vkDestroyShaderModule(device->handle, boid_vert_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_mesh_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_task_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_frag_module, vkb);
+
+	vkDestroyShaderModule(device->handle, boid_grid_overlay_mesh_module, vkb);
+	vkDestroyShaderModule(device->handle, boid_grid_overlay_frag_module, vkb);
+		
+	return rast;
+}
+
+void destroy_rasterization_pipelines(RasterizationPipelines rast)
+{
+	GraphicsDevice *device = rast.device;
+	destroy_graphics_descriptor_set_layout(rast.descriptor_set_layout);
+	vkDestroyRenderPass(device->handle, rast.render_pass, vkb);
+	vkDestroySampler(device->handle, rast.mono_sampler, vkb);
+	vkDestroySampler(device->handle, rast.inspect_sampler, vkb);
+
+	vkDestroyPipeline(device->handle, rast.vertex2, vkb);
+	vkDestroyPipeline(device->handle, rast.vertex2_wireframe, vkb);
+	vkDestroyPipeline(device->handle, rast.boid, vkb);
+	vkDestroyPipeline(device->handle, rast.boid_mesh, vkb);
+	vkDestroyPipeline(device->handle, rast.boid_grid_overlay, vkb);
+
+	vkDestroyPipelineLayout(device->handle, rast.layout, vkb);
+}
+
+VkFramebuffer *create_rasterization_framebuffers(Arena *arena, RasterizationPipelines rast, u32 count, GraphicsDeviceImage *target_images, GraphicsDeviceImage *msaa_images)
+{
+	Scratch scratch = find_scratch(0,0,0);
+	u32 attachment_count = (target_images != 0) + (msaa_images != 0);
+	VkFramebuffer *framebuffers = arena_push(arena, 0, sizeof(VkFramebuffer) * count);
+	for(u32 i = 0; i < count; i++)
+	{
+		VkImageView *attachments = arena_push(scratch.arena, 0, attachment_count * sizeof(VkImageView));
+		if(attachment_count == 1)
+		{
+			attachments[0] = target_images[i].view;
+		}
+		else if(attachment_count == 2)
+		{
+			attachments[0] = msaa_images[i].view;
+			attachments[1] = target_images[i].view;
+		}
+		else
+		{
+			print("Create framebuffer: unsupported attachment count!\n");
+		}
+		VkFramebufferCreateInfo info = {
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = rast.render_pass,
+			.attachmentCount = attachment_count,
+			.pAttachments = attachments,
+			.width = target_images[i].size.x,
+			.height = target_images[i].size.y,
+			.layers = 1,
+		};
+		VK_ASSERT(vkCreateFramebuffer(rast.device->handle, &info, vkb, &framebuffers[i]));
+	}
+	regress_scratch(scratch);
+	return framebuffers;
+}
+
+void cmd_begin_rasterization_render_pass(GraphicsCommandBuffer cb, VkRenderPass render_pass, VkFramebuffer framebuffer, u32x2 size, f32x4 color)
+{
+	VkClearValue cv = (VkClearValue){.color = {{color.r, color.g, color.b, color.a}}};
+	VkRenderPassBeginInfo info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = render_pass,
+		.framebuffer = framebuffer,
+		.renderArea = {.offset = {0,0},.extent = {size.x, size.y}},
+		.clearValueCount = 1,
+		.pClearValues = &cv,
+	};
+	vkCmdBeginRenderPass(cb.handle, &info, VK_SUBPASS_CONTENTS_INLINE);
+}
