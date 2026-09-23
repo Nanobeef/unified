@@ -19,13 +19,7 @@ typedef struct{
 }RasterizationFramebuffer;
 
 
-typedef struct{
-	GraphicsDevice *device;
-	VkPipeline pipeline;
-	u32 local_x, local_y, local_z;
-}ComputePipeline;
 
-VkPipeline create_compute_pipeline_from_file(GraphicsDevice *device, VkPipelineLayout layout, const char *path);
 
 typedef struct{
 	VkShaderModule vertex2_vert;	

@@ -7,7 +7,7 @@ typedef union f64x2{
 	struct{f64 s[2];};
 	struct{f64 x,y;};
 	struct{f64 a,b;};
-#ifdef SSE_CORE
+#ifdef F64X2_SSE
 	struct{__m128d v;};
 #endif
 }f64x2;

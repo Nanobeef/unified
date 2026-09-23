@@ -41,7 +41,7 @@ void *audio_thread(Thread *thread)
 		if(elapsed_time < rate && 0)
 		{
 			u64 sleep_time = rate - elapsed_time;
-			print("sleep %t\n", sleep_time);
+			//print("sleep %t\n", sleep_time);
 			usleep(sleep_time / 1000);
 		}
 		start_time = get_time_ns();
@@ -91,7 +91,15 @@ void *audio_thread(Thread *thread)
 				f32 target_amp = 0.0f;
 				if(m->velocity)
 				{
-					target_amp = 0.1f;
+					f32 fade = 0.0;
+					if(time - m->press_time < note_time)
+					{
+						fade = (f64)(note_time - (time - m->press_time)) / (f64)note_time;
+						fade = fade * fade;
+					}
+					f32 v = (f32)m->velocity / (256.0); 
+					target_amp = v;
+					target_amp *= fade;
 				}
 
 				f32 ramp_speed = 0.0005f;
@@ -105,6 +113,10 @@ void *audio_thread(Thread *thread)
 
 				f32 freq = freq_table[j];
 				sample += sinf(m->phase) * m->amp;
+				if(sample > 1.0f)
+				{
+					sample = 0.999f;
+				}
 				m->phase += phase_inc_base * freq;
 				if(m->phase > PI2) 
 					m->phase -= PI2;

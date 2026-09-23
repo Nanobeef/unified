@@ -8,6 +8,7 @@ typedef struct{
 	u32x2 size;
 	u32 image_index;
 	u32 image_count;
+	b32 has_image_view;
 	GraphicsDeviceImage *images;
 	VkResult result;
 	VkSwapchainCreateInfoKHR create_info;

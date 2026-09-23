@@ -3,9 +3,12 @@
 
 mode="$1"
 if [[ -z "$mode" ]]; then
-	./a.out
+	./unified
+elif [[ "$mode" = "detached" ]]; then
+	./unified $
 elif [[ "$mode" = "debug" ]]; then
-	gdb a.out
+#	~/dev/raddebugger/build/raddbg unified
+	gdb unified
 fi
 
 

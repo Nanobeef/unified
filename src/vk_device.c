@@ -144,7 +144,7 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 	}
 
 	const char *extensions[] = {
-		"VK_KHR_swapchain",	
+		"VK_KHR_swapchain",
 		VK_EXT_MESH_SHADER_EXTENSION_NAME,
 		VK_KHR_SPIRV_1_4_EXTENSION_NAME,
 		"VK_KHR_shader_float_controls",

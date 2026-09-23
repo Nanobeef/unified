@@ -55,6 +55,17 @@ void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBar
 	regress_scratch(scratch);
 }
 
+void cmd_graphics_pipeline_image_barrier(GraphicsCommandBuffer cb, u32 image_memory_barrier_count,  GraphicsImageMemoryBarrier *image_barriers, VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage)
+{
+	GraphicsPipelineBarrier barrier = {
+		.image_memory_barrier_count = image_memory_barrier_count,
+		.image_memory_barriers = image_barriers,
+		.src_stage = src_stage,
+		.dst_stage = dst_stage,
+	};
+	cmd_graphics_pipeline_barrier(cb, barrier);
+}
+
 GraphicsEvent create_graphics_event(GraphicsDevice *device)
 {
 	VkEventCreateInfo info = {

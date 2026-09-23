@@ -21,7 +21,7 @@ void main()
 	uint counter = 0;
 	float counter_color = 0.0;
 	{
-		if(false)
+		if(true)
 		{
 			counter = grid_counters.data[counter_index];
 			counter_color = float(counter) / float(64);

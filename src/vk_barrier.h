@@ -34,6 +34,7 @@ typedef struct{
 }GraphicsPipelineBarrier;
 
 void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBarrier barrier);
+void cmd_graphics_pipeline_image_barrier(GraphicsCommandBuffer cb, u32 image_memory_barrier_count,  GraphicsImageMemoryBarrier *image_barriers, VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage);
 
 GraphicsEvent create_graphics_event(GraphicsDevice *device);
 GraphicsEvent* create_graphics_events(Arena *arena, GraphicsDevice *device, u32 count);

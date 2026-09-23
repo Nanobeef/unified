@@ -103,7 +103,7 @@ typedef struct{
 
 
 typedef struct{
-	u16vec2 version;	
+	u16x2 version;	
 	u16 num_glyphs; // loca 
 	u16 max_points;
 	u16 max_contours;

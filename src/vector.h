@@ -28,34 +28,41 @@
 #ifdef AVX2_CORE
 #endif
 #ifdef AVX512_CORE
+	#define U32X16_AVX
 #endif
 
 typedef struct{
 	u16 x,y;
-}u16vec2;
+}u16x2;
 
-#include "u32x2.h"
-#include "s32x2.h"
+#include "u32x.h"
+#include "u32x2.c"
+#include "u32x4.c"
+#include "u32x8.c"
+#include "u32x16.c"
+
+#include "s32x.h"
+#include "s32x2.c"
+#include "s32x4.c"
+#include "s32x8.c"
+#include "s32x16.c"
 
 #include "f32.h"
 #include "f32x2.h"
 #include "f32x4.h"
 #include "f64x2.h"
 
-
-#include "u32x2.c"
-#include "s32x2.c"
-
 #include "f32.c"
 #include "f32x2.c"
 #include "f32x4.c"
 #include "f64x2.c"
+#include "f32x16.h"
 
 
 #include "f32m3.h"
 #include "f32m3.c"
 
-#include "f32x16.h"
+
 
 static f32x2 f32x2_cast_u32x2(u32x2 a)
 {

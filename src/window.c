@@ -33,7 +33,7 @@ Window *create_window(Arena *arena)
 	);
 
 	f32 mm_per_inch = 25.4;
-	f32x2 screen_dpi = f32x2_set1(96.0);
+	f32x2 screen_dpi = f32x2_set1(163.0);
 	if((screen_size_in_mm.x != 0) && (screen_size_in_mm.y != 0))
 	{
 		screen_dpi = f32x2_set(
@@ -43,30 +43,6 @@ Window *create_window(Arena *arena)
 	}
 
 	xcb_visualid_t visual = 0;
-	if(0)
-	{
-
-		xcb_depth_iterator_t depth_iter = xcb_screen_allowed_depths_iterator(screen);	
-		while(depth_iter.rem)
-		{
-			if(depth_iter.data->depth == 32)
-			{
-				xcb_visualtype_iterator_t vis_iter = xcb_depth_visuals_iterator(depth_iter.data);
-				while(vis_iter.rem)
-				{
-					if(vis_iter.data->_class == XCB_VISUAL_CLASS_TRUE_COLOR)
-					{
-						//print("%u32\n", vis_iter.data->_class);
-						visual = vis_iter.data->visual_id;
-						goto VISUAL_FOUND;
-					}
-					xcb_visualtype_next(&vis_iter);
-				}
-			}
-			xcb_depth_next(&depth_iter);
-		}
-		VISUAL_FOUND:
-	}
 
 	u64 refresh_rate = 0;
 	{

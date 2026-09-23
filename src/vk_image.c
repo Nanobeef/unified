@@ -1,4 +1,9 @@
 
+GraphicsDeviceImage resize_graphics_device_image(GraphicsDeviceImage image, u32x2 size)
+{
+	return create_graphics_device_image_explicit(image.memory.heap, size, image.format, image.usage, image.tiling, image.sample_count);
+}
+
 GraphicsDeviceImage create_graphics_device_image_explicit(GraphicsDeviceMemoryHeap *heap, u32x2 size, VkFormat format, VkImageUsageFlags usage, VkImageTiling tiling, VkSampleCountFlags sample_count)
 {
 	GraphicsDevice *device = heap->device;

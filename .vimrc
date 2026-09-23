@@ -5,28 +5,29 @@ let vimrc_path = expand('<sfile>:p:h')
 
 
 
-map <C-0> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh TCC debug)" <CR>
-map <C-9> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GCC debug)" <CR>
-map <C-8> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG debug)" <CR>
-map <C-1> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG debug) && (./compile.sh GCC debug) && (./compile.sh TCC debug)" <CR>
+map <F1> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh TCC debug)" <CR>
+map <F2> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GCC debug)" <CR>
+map <F3> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG debug)" <CR>
+
+map <F5> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh TCC release)" <CR>
+map <F6> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GCC release)" <CR>
+map <F7> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG release)" <CR>
+
+map <C-0> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG debug) && (./compile.sh GCC debug) && (./compile.sh TCC debug)" <CR>
+map <C-9> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG release) && (./compile.sh GCC release) && (./compile.sh TCC release)" <CR>
 
 
-map <C-G> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GLSLC special)" <CR>
-map <C-T> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GLSLC debug)" <CR>
-map <C-Y> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GLSLC release)" <CR>
+map <C-W> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GLSLC debug)" <CR>
+map <C-E> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GLSLC release)" <CR>
+
 map <C-A> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh TCC debug)" <CR>
 map <C-F> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh GCC release)" <CR>
+map <C-R> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh CLANG release)" <CR>
+
 map <C-S> :execute "!clear && cd " . shellescape(vimrc_path) . " &&  ./run.sh" <CR>
 map <C-D> :execute "!clear && cd " . shellescape(vimrc_path) . " &&  ./run.sh debug" <CR>
 map <C-Q> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./run.sh detached)" <CR> <CR>
 
-
-
-map <C-F8> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh clean) " <CR>
-map <C-F9> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh clean) && (./compile.sh)" <CR>
-map <C-F10> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh clean) && (./compile.sh release)" <CR>
-map <C-F11> :execute "!clear && cd " . shellescape(vimrc_path) . " && (./compile.sh clean) && (./compile.sh release all)" <CR>
-map <C-F12> :execute "!clear && cd " . shellescape(vimrc_path) . " &&  ./run.sh all" <CR> <CR>
 
 map <C-\> :tab split<CR>:exec("tag ".expand("<cword>"))<CR>
 map <A-]> :vsp <CR>:exec("tag ".expand("<cword>"))<CR>

@@ -14,6 +14,7 @@ VkImageView create_graphics_swapchain_image_view(GraphicsDevice *device, VkImage
 	return handle;
 }
 
+
 GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain swapchain)
 {
 	Scratch scratch = find_scratch(0,0,0);
@@ -31,9 +32,12 @@ GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain sw
 	if(info.oldSwapchain)
 	{
 		vkDestroySwapchainKHR(device->handle, info.oldSwapchain, vkb);
-		for(u32 i = 0; i < swapchain.image_count; i++)
+		if(swapchain.has_image_view)
 		{
-			vkDestroyImageView(device->handle, swapchain.images[i].view, vkb);
+			for(u32 i = 0; i < swapchain.image_count; i++)
+			{
+				vkDestroyImageView(device->handle, swapchain.images[i].view, vkb);
+			}
 		}
 	}
 	info.oldSwapchain = swapchain.handle;
@@ -46,12 +50,15 @@ GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain sw
 	{
 		swapchain.images[i] = (GraphicsDeviceImage){
 			.handle = images[i],
-			.view = create_graphics_swapchain_image_view(device, images[i], info.imageFormat),
 			.size = u32x2_set(info.imageExtent.width, info.imageExtent.height),
 			.format = info.imageFormat,
 			.tiling = VK_IMAGE_TILING_OPTIMAL,
 			.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
 		};
+		if(swapchain.has_image_view)
+		{
+			swapchain.images[i].view = create_graphics_swapchain_image_view(device, images[i], info.imageFormat);
+		}
 	}
 	swapchain.create_info = info;
 	regress_scratch(scratch);
@@ -79,6 +86,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 	VkSurfaceFormatKHR chosen_surface_format = surface_formats[0];
 	for(u32 i = 0; i < surface_format_count; i++)
 	{
+//		print("%u32 of %u32 %u32 in %u32\n",i ,surface_format_count, surface_formats[i].format, surface_formats[i].colorSpace);
 		if(
 			surface_formats[i].format == VK_FORMAT_R8G8B8A8_SRGB || 
 			surface_formats[i].format == VK_FORMAT_B8G8R8A8_SRGB
@@ -100,14 +108,14 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 			chosen_present_mode = present_modes[i];	
 		}
 	}
-	chosen_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+	chosen_present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
 	regress_scratch(scratch);
 
 	VkSurfaceCapabilitiesKHR surface_capabilities = {0};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical.handle, surface.handle, &surface_capabilities);
 
-	VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 	VkSwapchainCreateInfoKHR info = {
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -127,15 +135,22 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 	GraphicsSwapchain swapchain = {.device = device, .create_info = info};
 	swapchain.format = info.imageFormat;
 	swapchain.size = u32x2_set(info.imageExtent.width, info.imageExtent.height);
+	if(swapchain.create_info.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_STORAGE_BIT|VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
+	{
+		swapchain.has_image_view = true;	
+	}
 	swapchain = recreate_graphics_swapchain(arena, swapchain);
 	return swapchain;
 }
 
 void destroy_graphics_swapchain(GraphicsSwapchain swapchain)
 {
-	for(u32 i = 0; i < swapchain.image_count; i++)
+	if(swapchain.has_image_view)
 	{
-		vkDestroyImageView(swapchain.device->handle, swapchain.images[i].view, vkb);
+		for(u32 i = 0; i < swapchain.image_count; i++)
+		{
+			vkDestroyImageView(swapchain.device->handle, swapchain.images[i].view, vkb);
+		}
 	}
 	vkDestroySwapchainKHR(swapchain.device->handle, swapchain.handle, vkb);
 }
