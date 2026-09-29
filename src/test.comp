@@ -1,29 +1,74 @@
 #version 450 core
 #pragma shader_stage(compute)
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-
-layout(set = 0, binding = 0, rgba8) uniform image2D target;
+#include "test_comp.h"
 
 
+// Implicit entrypoint macros 
+/*
+		
+*/
+
+
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) writeonly uniform image2D target;
+layout(set = 0, binding = 1) readonly  buffer PingBuffer{
+	uvec2 data[];	
+}ping;
+layout(set = 0, binding = 2) writeonly buffer PongBuffer{
+	uvec2 data[];	
+}pong;
+
+layout(push_constant) uniform PushConstant{
+	mat3x3 affine;
+	uint time_us;
+	uint frame_accum;
+	float zoom;
+	uint count;
+}pc;
+
+
+#ifdef DRAW
 void main()
 {
 	uvec2 tid = gl_GlobalInvocationID.xy;
 	uvec2 target_size = imageSize(target);
-	if(tid.x < target_size.x && tid.y < target_size.y)
+	vec2 pixel = ((vec2(tid) / target_size) - 0.5) * 2.0;
+	pixel = (vec3(pixel,1.0) * pc.affine).xy;
+	pixel.y = -pixel.y;
+
+	vec2 pixel_size = 0.5 * pc.zoom / target_size;
+
+	uint rs = romu_mono_init((tid.x + tid.y * gl_NumWorkGroups.x * 32) * pc.frame_accum);
+
+	uint circle_count = 100;
+
+	float sample_accum = 0;
+	vec2 offset = vec2(
+		romu_mono_float(rs),
+		romu_mono_float(rs)
+	) * pixel_size;
+
+	float color = 0.0;
+	uint rs_static = romu_mono_init(12123);
+	for(uint j = 0; j < circle_count; j++)
 	{
-		uvec2 id = tid / 10;
-		uint v = id.x + (id.y & 1);
-		if((v & 1) == 0)
-		{
-			vec4 color = vec4(1.0, 0.1, 0.1, 1.0);
-			imageStore(target, ivec2(tid), color);
-		}
-		else
-		{
-			vec4 color = vec4(0.0, 0.1, 0.1, 1.0);
-			imageStore(target, ivec2(tid), color);
-		}
+		Circle c = random_circle(rs_static);
+		vec2 pos = c.position;;
+		float radius = c.radius;
+		float sd = sd_circle(offset + pixel + pos, radius);
+		color = min(color, sd);
 	}
 
+	color = smoothstep(0.0, -pixel_size.y * 16.0, color);
+	imageStore(target, ivec2(tid), vec4(color));
 }
+
+#endif // DRAW
+
+#ifdef RESET
+void main()
+{
+}
+#endif // RESET

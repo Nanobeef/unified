@@ -5,6 +5,8 @@ get_time_us(){
 	echo $(( (10#$sec * 1000000) + (10#$nano / 1000) ))
 }
 
+glsl_flags=" -O0 --target-env=vulkan1.2"
+
 compile_shaders(){
 
 	glslc $glsl_flags src/boid_resolve.comp -o build/boid_resolve_comp.spv &
@@ -13,7 +15,7 @@ compile_shaders(){
 	glslc $glsl_flags src/boid_prefix_sum.comp -o build/boid_prefix_sum_comp.spv &
 	glslc $glsl_flags src/boid_fill.comp -o build/boid_fill_comp.spv &
 
-	glslc $glsl_flags src/test.comp -o build/test_comp.spv &
+	glslc $glsl_flags -DDRAW src/test.comp -o build/test_comp.spv &
 
 	glslc $glsl_flags src/boid.vert -o build/boid_vert.spv &
 	glslc $glsl_flags src/boid.frag -o build/boid_frag.spv &
@@ -33,7 +35,6 @@ build_type="$2"
 
 target="unified_compiling"
 
-glsl_flags=" -O --target-env=vulkan1.2"
 
 if [[ -z "$compiler" ]]; then
 	$compiler="TCC"	
