@@ -1,7 +1,7 @@
 #version 450 core
 #pragma shader_stage(compute)
 
-#include "test_comp.h"
+#include "unified_comp.h"
 
 
 // Implicit entrypoint macros 
@@ -13,19 +13,29 @@
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) writeonly uniform image2D target;
-layout(set = 0, binding = 1) readonly  buffer PingBuffer{
+
+layout(set = 0, binding = 1) readonly  buffer TargetBuffers{
 	uvec2 data[];	
-}ping;
-layout(set = 0, binding = 2) writeonly buffer PongBuffer{
+}target_buffers[2];
+
+layout(set = 0, binding = 1) readonly  buffer ScratchBuffers{
 	uvec2 data[];	
-}pong;
+}scratch_buffers[2];
+
+layout(set = 0, binding = 1) readonly  buffer CounterBuffers{
+	uvec2 data[];	
+}counter_buffers[2];
+
+layout(set = 0, binding = 1) readonly  buffer OffsetBuffers{
+	uvec2 data[];	
+}offset_buffsers[2];
 
 layout(push_constant) uniform PushConstant{
 	mat3x3 affine;
 	uint time_us;
 	uint frame_accum;
 	float zoom;
-	uint count;
+	uint particle_count;
 }pc;
 
 
@@ -67,8 +77,26 @@ void main()
 
 #endif // DRAW
 
-#ifdef RESET
+#ifdef COUNT 
 void main()
 {
 }
-#endif // RESET
+#endif // COUNT 
+
+#ifdef PREFIX
+void main()
+{
+}
+#endif // PREFIX 
+
+#ifdef FILL
+void main()
+{
+}
+#endif // FILL 
+
+#ifdef RESOLVE 
+void main()
+{
+}
+#endif // RESOLVE 

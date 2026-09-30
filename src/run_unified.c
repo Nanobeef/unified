@@ -62,15 +62,28 @@ s32 run_unified(void)
 	Camera inspect_camera = init_camera();
 	FixedCamera fixed_camera = create_fixed_camera(window->size);
 
+	u32 hardware_wave_count = 1024;
+
 	u32 max_target_buffer_count = MiB(1);
 	u32 target_buffer_count = max_target_buffer_count;
+	u32 target_buffer_size = max_target_buffer_count * sizeof(u16x2);
+	u32 scratch_buffer_size = 4096 * hardware_wave_count * sizeof(u32);
+	u32 counter_buffer_size = 4096 * sizeof(u32);
+	u32 offset_buffer_size = 4096 * sizeof(u32x2);
+
 
 	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceImage, target_images);
 	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceBuffer, target_buffers);
+	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceBuffer, scratch_buffers);
+	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceBuffer, counter_buffers);
+	arena_push_type(main_arena, 0, frame_count, GraphicsDeviceBuffer, offset_buffers);
 	for(u32 i = 0; i < frame_count; i++)
 	{
 		target_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT);
-		target_buffers[i] = create_graphics_device_buffer(device->device_heap, max_target_buffer_count * 2, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+		target_buffers[i] = create_graphics_device_buffer(device->device_heap, target_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+		scratch_buffers[i] = create_graphics_device_buffer(device->device_heap, scratch_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+		counter_buffers[i] = create_graphics_device_buffer(device->device_heap, counter_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+		offset_buffers[i] = create_graphics_device_buffer(device->device_heap, offset_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	}
 
 
@@ -87,8 +100,11 @@ s32 run_unified(void)
 		};
 		VkDescriptorSetLayoutBinding bindings[] = {
 			{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+
+			{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, VK_SHADER_STAGE_COMPUTE_BIT, 0},
 		};
 		render_descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 		VkPipelineLayoutCreateInfo info = {
@@ -110,7 +126,34 @@ s32 run_unified(void)
 		render_descriptor_pool = create_graphics_descriptor_pool(main_arena, device, frame_count, set_layouts);
 	}
 
-	VkPipeline test_compute = create_compute_pipeline_from_file(device, pipeline_layout, "build/test_comp.spv");
+	VkPipeline draw_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
+	VkPipeline count_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
+	VkPipeline prefix_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
+	VkPipeline fill_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
+	VkPipeline resolve_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
+
+
+	{
+		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
+		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+
+
+
+		end_graphics_command_buffer(cb);
+		reset_graphics_fence(render_fences[frame_index]);
+		submit_command_buffers(
+			render_queue,
+			0, 0,
+			0, 0,
+			1, &cb, 
+			0,
+			render_fences[frame_index]
+		);
+
+	}
+
+
+
 
 
 	u64 frame_start_time = get_epoch_ns() - window->refresh_rate;
@@ -133,7 +176,7 @@ s32 run_unified(void)
 		}
 
 		frame_start_time = get_epoch_ns();
-		if(frame_accum % 10 == 0)
+		if(frame_accum % 100 == 0)
 			print("Time = %t\n", frame_elapsed_time);
 		frame_time = frame_elapsed_time + frame_sleep_time;
 		
@@ -174,59 +217,6 @@ s32 run_unified(void)
 			{
 				target_images[i] = resize_graphics_device_image(target_images[i], u32x2_div1(swapchain.size, 1));
 			}
-			{
-				VkWriteDescriptorSet writes[frame_count * 3];
-				VkDescriptorImageInfo image_infos[frame_count];
-				VkDescriptorBufferInfo ping_infos[frame_count];
-				VkDescriptorBufferInfo pong_infos[frame_count];
-				for(u32 i = 0; i < frame_count; i++)
-				{
-					image_infos[i] = (VkDescriptorImageInfo)
-					{
-						.imageView = target_images[i].view,
-						.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-					};
-					ping_infos[i] = (VkDescriptorBufferInfo)
-					{
-						.buffer = target_buffers[i].handle,
-						.range = VK_WHOLE_SIZE,
-					};
-					pong_infos[i] = (VkDescriptorBufferInfo)
-					{
-						.buffer = target_buffers[(i + 1) % frame_count].handle,
-						.range = VK_WHOLE_SIZE,
-					};
-					writes[i * 3 + 0] = (VkWriteDescriptorSet)
-					{
-						.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-						.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
-						.dstBinding = 0,
-						.descriptorCount = 1,
-						.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-						.pImageInfo = &image_infos[i],
-					};
-					writes[i * 3 + 1] = (VkWriteDescriptorSet)
-					{
-						.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-						.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
-						.dstBinding = 1,
-						.descriptorCount = 1,
-						.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-						.pBufferInfo = &ping_infos[i],
-					};
-					writes[i * 3 + 2] = (VkWriteDescriptorSet)
-					{
-						.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-						.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
-						.dstBinding = 2,
-						.descriptorCount = 1,
-						.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-						.pBufferInfo = &pong_infos[i],
-					};
-							
-				}
-				vkUpdateDescriptorSets(device->handle, Arrlen(writes), writes, 0,0);
-			}
 
 			destroy_graphics_semaphore(swapchain_semaphores[frame_index]);
 			swapchain_semaphores[frame_index] = create_graphics_semaphore(device);
@@ -234,11 +224,157 @@ s32 run_unified(void)
 			just_resized = true;
 			continue;
 		}
+		else
+		{
+			just_resized = false;
+		}
+
+		if(just_resized || (frame_accum == 0)){
+			u32 descriptor_count = 5;
+			u32 image_count = 1;
+			u32 buffer_count= 8;
+			VkWriteDescriptorSet writes[frame_count * descriptor_count];
+			VkDescriptorImageInfo image_infos[frame_count * image_count];
+			VkDescriptorBufferInfo buffer_infos[frame_count * buffer_count];
+			for(u32 i = 0; i < frame_count; i++)
+			{
+				image_infos[i] = (VkDescriptorImageInfo)
+				{
+					.imageView = target_images[i].view,
+					.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+				};
+
+				buffer_infos[i * buffer_count + 0] = (VkDescriptorBufferInfo)
+				{
+					.buffer = target_buffers[i].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+				buffer_infos[i * buffer_count + 1] = (VkDescriptorBufferInfo)
+				{
+					.buffer = target_buffers[(i + 1) % frame_count].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+
+				buffer_infos[i * buffer_count + 2] = (VkDescriptorBufferInfo)
+				{
+					.buffer = scratch_buffers[i].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+				buffer_infos[i * buffer_count + 3] = (VkDescriptorBufferInfo)
+				{
+					.buffer = scratch_buffers[(i + 1) % frame_count].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+
+				buffer_infos[i * buffer_count + 4] = (VkDescriptorBufferInfo)
+
+				{
+					.buffer = counter_buffers[i].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+				buffer_infos[i * buffer_count + 5] = (VkDescriptorBufferInfo)
+				{
+					.buffer = counter_buffers[(i + 1) % frame_count].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+
+				buffer_infos[i * buffer_count + 6] = (VkDescriptorBufferInfo)
+				{
+					.buffer = offset_buffers[i].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+				buffer_infos[i * buffer_count + 7] = (VkDescriptorBufferInfo)
+				{
+					.buffer = offset_buffers[(i + 1) % frame_count].handle,
+					.range = VK_WHOLE_SIZE,
+				};
+
+
+
+				writes[i * descriptor_count + 0] = (VkWriteDescriptorSet)
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
+					.dstBinding = 0,
+					.descriptorCount = 1,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+					.pImageInfo = &image_infos[i],
+				};
+				writes[i * descriptor_count + 1] = (VkWriteDescriptorSet)
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
+					.dstBinding = 1,
+					.descriptorCount = 2,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = buffer_infos + 0,
+				};
+				writes[i * descriptor_count + 2] = (VkWriteDescriptorSet)
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
+					.dstBinding = 2,
+					.descriptorCount = 2,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = buffer_infos + 2,
+				};
+				writes[i * descriptor_count + 3] = (VkWriteDescriptorSet)
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
+					.dstBinding = 3,
+					.descriptorCount = 2,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = buffer_infos + 4,
+				};
+				writes[i * descriptor_count + 4] = (VkWriteDescriptorSet)
+				{
+					.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+					.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
+					.dstBinding = 4,
+					.descriptorCount = 2,
+					.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+					.pBufferInfo = buffer_infos + 6,
+				};
+						
+			}
+			vkUpdateDescriptorSets(device->handle, Arrlen(writes), writes, 0,0);
+		}
+
 		GraphicsDeviceImage swapchain_image = swapchain.images[swapchain.image_index];
 		update_camera(&camera, pe, window->size, false);
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+
+
+		if(frame_accum < swapchain.image_count)
+		{
+			GraphicsImageMemoryBarrier barrier = {
+				.image = swapchain.images[swapchain.image_index],
+				.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
+				.src_access = VK_ACCESS_NONE,
+				.dst_access = VK_ACCESS_MEMORY_READ_BIT,
+				.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.new_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+			};
+			cmd_graphics_pipeline_image_barrier(cb, 1, &barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		}
+		if(frame_accum < frame_count)
+		{
+			GraphicsImageMemoryBarrier barrier = {
+				.image = target_images[frame_index],
+				.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
+				.src_access = VK_ACCESS_NONE,
+				.dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+				.new_layout = VK_IMAGE_LAYOUT_GENERAL,
+			};
+			cmd_graphics_pipeline_image_barrier(cb, 1, &barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		}
+
+
+
 
 
 
@@ -258,7 +394,7 @@ s32 run_unified(void)
 			vkCmdPushConstants(cb.handle, pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
 		}
 
-		vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, test_compute);
+		vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, draw_pipeline);
 		vkCmdDispatch(cb.handle, dispatch_size.x, dispatch_size.y,1);
 
 
@@ -327,7 +463,11 @@ s32 run_unified(void)
 	vkDeviceWaitIdle(device->handle);
 
 
-	vkDestroyPipeline(device->handle, test_compute, vkb);;
+	vkDestroyPipeline(device->handle, draw_pipeline, vkb);;
+	vkDestroyPipeline(device->handle, count_pipeline, vkb);;
+	vkDestroyPipeline(device->handle, prefix_pipeline, vkb);;
+	vkDestroyPipeline(device->handle, fill_pipeline, vkb);;
+	vkDestroyPipeline(device->handle, resolve_pipeline, vkb);;
 	destroy_graphics_descriptor_pool(render_descriptor_pool);
 	destroy_graphics_descriptor_set_layout(render_descriptor_set_layout);
 	vkDestroyPipelineLayout(device->handle, pipeline_layout, vkb);
@@ -337,6 +477,9 @@ s32 run_unified(void)
 	{
 		destroy_graphics_device_image(target_images[i]);
 		destroy_graphics_device_buffer(target_buffers[i]);
+		destroy_graphics_device_buffer(scratch_buffers[i]);
+		destroy_graphics_device_buffer(counter_buffers[i]);
+		destroy_graphics_device_buffer(offset_buffers[i]);
 	}
 
 
