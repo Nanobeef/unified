@@ -26,7 +26,8 @@ Scratch find_scratch(struct Thread *thread, u32 conflict_count, Arena **conflict
 Scratch force_scratch(u32 index);
 void regress_scratch(Scratch scratch);
 
-#define arena_push_type( ARENA, ZERO, COUNT , TYPE , NAME) TYPE* NAME = (TYPE*)arena_push(ARENA, ZERO, (COUNT) * sizeof(TYPE));
+#define arena_push_name( ARENA, ZERO, COUNT , TYPE , NAME) TYPE* NAME = (TYPE*)arena_push(ARENA, ZERO, (COUNT) * sizeof(TYPE));
+//#define arena_push_type( ARENA, ZERO, COUNT , TYPE , NAME) (TYPE*)arena_push(ARENA, ZERO, (COUNT) * sizeof(TYPE));
 
 
 #define TOTAL( VARIABLE ) (*(((u64*)(VARIABLE))-1))

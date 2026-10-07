@@ -20,8 +20,8 @@ PhysicalGraphicsDevice pick_physical_graphics_device(Arena *arena, GraphicsInsta
 	}
 
 
-	arena_push_type(scratch.arena, 0, physical_device_count, PhysicalGraphicsDevice, physical_devices);
-	arena_push_type(scratch.arena, 0, physical_device_count, VkPhysicalDevice, physical_device_handles);
+	arena_push_name(scratch.arena, 0, physical_device_count, PhysicalGraphicsDevice, physical_devices);
+	arena_push_name(scratch.arena, 0, physical_device_count, VkPhysicalDevice, physical_device_handles);
 	vkEnumeratePhysicalDevices(instance->handle, &physical_device_count, physical_device_handles);
 	for(u32 i = 0; i < physical_device_count; i++)
 	{
@@ -145,20 +145,21 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 
 	const char *extensions[] = {
 		"VK_KHR_swapchain",
-		VK_EXT_MESH_SHADER_EXTENSION_NAME,
-		VK_KHR_SPIRV_1_4_EXTENSION_NAME,
 		"VK_KHR_shader_float_controls",
+		"VK_KHR_shader_clock",
+		"VK_KHR_shader_non_semantic_info",
 	};
 
-	VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
-		.meshShader = true,
-		.taskShader = true,
+	VkPhysicalDeviceShaderClockFeaturesKHR shader_clock = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR,
+		.shaderSubgroupClock = true,
+		.shaderDeviceClock = true,
 	};
 
+		
 	VkPhysicalDeviceShaderFloat16Int8Features shader_float_16 = {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
-		.pNext = &mesh_shader_features,
+		.pNext = &shader_clock,
 		.shaderFloat16 = true,
 	};
 
@@ -173,6 +174,7 @@ GraphicsDevice *create_graphics_device(Arena* arena, GraphicsInstance *instance,
 		.fillModeNonSolid = true,
 		.pipelineStatisticsQuery = true,
 		.fragmentStoresAndAtomics = true,
+		.shaderInt64 = true,
 
 	};
 

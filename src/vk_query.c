@@ -81,7 +81,7 @@ PipelineStatisticQueryResult *get_graphics_pipeline_statistic_query_pool_results
 	u64 used = USED(pool.names_array);	
 	Scratch scratch = find_scratch(0,1,&arena);
 	u32 stat_count = popcount(pool.statistic_flags);
-	arena_push_type(scratch.arena, false, used * stat_count, u64, counters);
+	arena_push_name(scratch.arena, false, used * stat_count, u64, counters);
 	PipelineStatisticQueryResult *results = allocate_array(arena, PipelineStatisticQueryResult, used * stat_count);
 	if(used)
 	{
@@ -147,7 +147,7 @@ TimestampQueryResult *get_graphics_timestamp_query_pool_results(Arena *arena, Gr
 {
 	u64 used = USED(pool.names_array);
 	Scratch scratch = find_scratch(0,1, &arena);
-	arena_push_type(scratch.arena, false, used, u64, counters);
+	arena_push_name(scratch.arena, false, used, u64, counters);
 	if(used)
 	{
 		vkGetQueryPoolResults(pool.device->handle, pool.handle, 0, used, sizeof(u64) * used, (void*)counters, sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);

@@ -25,6 +25,9 @@ u32x2 u32x2_abs(u32x2 v);
 u32 u32x2_area(u32x2 v);
 u32 u32x2_length_squared(u32x2 v);
 u32 u32x2_length(u32x2 v);
+u32x2 u32x2_unit(u32x2 v);
+u32 u32x2_distance(u32x2 v0, u32x2 v1);
+b32 u32x2_equal(u32x2 a, u32x2 b);
 
 
 typedef union{

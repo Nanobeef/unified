@@ -194,7 +194,7 @@ void wait_for_thread(Thread *thread)
 b32 begin_thread_work(Thread *thread, PFN_Thread *function, void *data)
 {
 	lock_mutex(&thread->mutex);
-	atomic_store(&thread->data, data);
+	atomic_store(&thread->data, (u64)data);
 	binary_signal_semaphore(&thread->working_semaphore);
 	atomic_store(&thread->function, (u64)function);
 	unlock_mutex(&thread->mutex);

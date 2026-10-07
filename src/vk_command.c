@@ -15,7 +15,7 @@ GraphicsCommandPool* create_graphics_command_pool(Arena *arena, GraphicsDeviceQu
 	pool->command_buffer_count = command_buffer_count;
 	pool->command_buffers = arena_push(arena, 0, command_buffer_count * sizeof(GraphicsCommandBuffer));
 
-	arena_push_type(scratch.arena, 0, command_buffer_count, VkCommandBuffer, command_buffers);
+	arena_push_name(scratch.arena, 0, command_buffer_count, VkCommandBuffer, command_buffers);
 
 	VkCommandBufferAllocateInfo alloc_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -52,7 +52,7 @@ void destroy_graphics_command_pools(u32 command_pool_count, GraphicsCommandPool 
 
 GraphicsCommandPool** create_graphics_command_pools(Arena *arena, GraphicsDeviceQueueFamily *queue_family, u32 command_pool_count, u32 command_buffer_count)
 {
-	arena_push_type(arena, 0, command_pool_count, GraphicsCommandPool*, command_pools);
+	arena_push_name(arena, 0, command_pool_count, GraphicsCommandPool*, command_pools);
 	for(u32 i = 0; i < command_pool_count; i++)
 	{
 		command_pools[i] = create_graphics_command_pool(arena, queue_family, command_buffer_count);
@@ -67,7 +67,7 @@ GraphicsCommandPool* reset_graphics_command_pool(GraphicsCommandPool *pool, b32 
 	if(realloc_buffers)
 	{
 		Scratch scratch = find_scratch(0,0,0);
-		arena_push_type(scratch.arena, 0, pool->command_buffer_count, VkCommandBuffer, command_buffers);
+		arena_push_name(scratch.arena, 0, pool->command_buffer_count, VkCommandBuffer, command_buffers);
 
 		VkCommandBufferAllocateInfo alloc_info = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,

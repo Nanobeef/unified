@@ -24,7 +24,7 @@ void perfground()
 	{
 		if(j & 1)
 		{
-			arena_push_type(scratch.arena, 0, c, u64, marks);
+			arena_push_name(scratch.arena, 0, c, u64, marks);
 			chron_begin(&cm);
 			u32 i = 0;
 			for(i; i < c; i++)
@@ -39,11 +39,11 @@ void perfground()
 			}
 			print("tsc %u64\n", tsc);
 			print("\n");
-			sink(i);
+			//sink(i);
 		}
 		else
 		{
-			arena_push_type(scratch.arena, 0, c, u64, marks);
+			arena_push_name(scratch.arena, 0, c, u64, marks);
 			u64 time = get_time_ns();
 			u32 i = 0;
 			for(i; i < c; i++)
@@ -55,7 +55,7 @@ void perfground()
 			for(i = 0; i < c; i++)
 			{
 			}
-			sink(i);
+			//sink(i);
 		}
 	}
 }

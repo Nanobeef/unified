@@ -2,7 +2,7 @@
 void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBarrier barrier)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, barrier.memory_barrier_count, VkMemoryBarrier, memory_barriers);
+	arena_push_name(scratch.arena, 0, barrier.memory_barrier_count, VkMemoryBarrier, memory_barriers);
 	for(u32 i = 0; i < barrier.memory_barrier_count; i++)
 	{
 		GraphicsMemoryBarrier mb = barrier.memory_barriers[i];
@@ -12,7 +12,7 @@ void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBar
 			.dstAccessMask = mb.dst_access,
 		};
 	}
-	arena_push_type(scratch.arena, 0, barrier.buffer_memory_barrier_count, VkBufferMemoryBarrier, buffer_memory_barriers);
+	arena_push_name(scratch.arena, 0, barrier.buffer_memory_barrier_count, VkBufferMemoryBarrier, buffer_memory_barriers);
 	for(u32 i = 0; i < barrier.buffer_memory_barrier_count; i++)
 	{
 		GraphicsBufferMemoryBarrier bmb = barrier.buffer_memory_barriers[i];
@@ -26,7 +26,7 @@ void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBar
 			.offset = bmb.offset,
 			.size = bmb.size,
 		};
-	} arena_push_type(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers); for(u32 i = 0; i < barrier.image_memory_barrier_count; i++) {
+	} arena_push_name(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers); for(u32 i = 0; i < barrier.image_memory_barrier_count; i++) {
 		GraphicsImageMemoryBarrier imb = barrier.image_memory_barriers[i];
 		VkImageSubresourceRange subresource_range = imb.subresource_range;
 		if(subresource_range.aspectMask == 0)
@@ -78,7 +78,7 @@ GraphicsEvent create_graphics_event(GraphicsDevice *device)
 
 GraphicsEvent* create_graphics_events(Arena *arena, GraphicsDevice *device, u32 count)
 {
-	arena_push_type(arena, 0, count, GraphicsEvent, events);
+	arena_push_name(arena, 0, count, GraphicsEvent, events);
 	for(u32 i = 0; i < count; i++)
 	{
 		VkEventCreateInfo info = {
@@ -133,7 +133,7 @@ void cmd_reset_graphics_event(GraphicsCommandBuffer cb, GraphicsEvent event, VkP
 void cmd_wait_graphics_event(GraphicsCommandBuffer cb, u32 event_count, GraphicsEvent *events, GraphicsPipelineBarrier barrier)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, barrier.memory_barrier_count, VkMemoryBarrier, memory_barriers);
+	arena_push_name(scratch.arena, 0, barrier.memory_barrier_count, VkMemoryBarrier, memory_barriers);
 	for(u32 i = 0; i < barrier.memory_barrier_count; i++)
 	{
 		GraphicsMemoryBarrier mb = barrier.memory_barriers[i];
@@ -143,7 +143,7 @@ void cmd_wait_graphics_event(GraphicsCommandBuffer cb, u32 event_count, Graphics
 			.dstAccessMask = mb.dst_access,
 		};
 	}
-	arena_push_type(scratch.arena, 0, barrier.buffer_memory_barrier_count, VkBufferMemoryBarrier, buffer_memory_barriers);
+	arena_push_name(scratch.arena, 0, barrier.buffer_memory_barrier_count, VkBufferMemoryBarrier, buffer_memory_barriers);
 	for(u32 i = 0; i < barrier.buffer_memory_barrier_count; i++)
 	{
 		GraphicsBufferMemoryBarrier bmb = barrier.buffer_memory_barriers[i];
@@ -158,7 +158,7 @@ void cmd_wait_graphics_event(GraphicsCommandBuffer cb, u32 event_count, Graphics
 			.size = bmb.size,
 		};
 	}
-	arena_push_type(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers);
+	arena_push_name(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers);
 	for(u32 i = 0; i < barrier.image_memory_barrier_count; i++)
 	{
 		GraphicsImageMemoryBarrier imb = barrier.image_memory_barriers[i];
@@ -179,7 +179,7 @@ void cmd_wait_graphics_event(GraphicsCommandBuffer cb, u32 event_count, Graphics
 			.subresourceRange = subresource_range,
 		};
 	}
-	arena_push_type(scratch.arena, 0, event_count, VkEvent, event_handles);
+	arena_push_name(scratch.arena, 0, event_count, VkEvent, event_handles);
 	for(u32 i = 0; i < event_count; i++)
 	{
 		event_handles[i] = events[i].handle;

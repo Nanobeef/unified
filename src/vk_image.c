@@ -1,6 +1,7 @@
 
 GraphicsDeviceImage resize_graphics_device_image(GraphicsDeviceImage image, u32x2 size)
 {
+	destroy_graphics_device_image(image);
 	return create_graphics_device_image_explicit(image.memory.heap, size, image.format, image.usage, image.tiling, image.sample_count);
 }
 

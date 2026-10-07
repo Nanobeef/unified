@@ -19,7 +19,7 @@ GraphicsDeviceBuffer create_graphics_device_buffer(GraphicsDeviceMemoryHeap *hea
 	VkMemoryRequirements requirements = {0};
 	vkGetBufferMemoryRequirements(heap->device->handle, buffer.handle, &requirements);
 
-	buffer.memory = allocate_graphics_device_memory(heap, size);
+	buffer.memory = allocate_graphics_device_memory(heap, requirements.size);
 
 	VK_ASSERT(vkBindBufferMemory(heap->device->handle, buffer.handle, buffer.memory.handle, buffer.memory.offset));
 

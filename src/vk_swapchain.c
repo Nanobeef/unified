@@ -26,7 +26,7 @@ GraphicsSwapchain recreate_graphics_swapchain(Arena *arena, GraphicsSwapchain sw
 	swapchain.size = u32x2_set(info.imageExtent.width, info.imageExtent.height);
 
 	vkGetSwapchainImagesKHR(device->handle, swapchain.handle, &swapchain.image_count, 0);
-	arena_push_type(scratch.arena, 0, swapchain.image_count, VkImage, images);
+	arena_push_name(scratch.arena, 0, swapchain.image_count, VkImage, images);
 	vkGetSwapchainImagesKHR(device->handle, swapchain.handle, &swapchain.image_count, images);
 
 	if(info.oldSwapchain)
@@ -81,7 +81,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 
 	u32 surface_format_count = 0;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical.handle, surface.handle, &surface_format_count, 0);
-	arena_push_type(scratch.arena, 0, surface_format_count, VkSurfaceFormatKHR, surface_formats);
+	arena_push_name(scratch.arena, 0, surface_format_count, VkSurfaceFormatKHR, surface_formats);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physical.handle, surface.handle, &surface_format_count, surface_formats);
 	VkSurfaceFormatKHR chosen_surface_format = surface_formats[0];
 	for(u32 i = 0; i < surface_format_count; i++)
@@ -98,7 +98,7 @@ GraphicsSwapchain create_graphics_swapchain(Arena *arena, GraphicsSurface surfac
 
 	u32 present_mode_count = 0;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical.handle, surface.handle, &present_mode_count, 0);
-	arena_push_type(scratch.arena, 0, present_mode_count, VkPresentModeKHR, present_modes);
+	arena_push_name(scratch.arena, 0, present_mode_count, VkPresentModeKHR, present_modes);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physical.handle, surface.handle, &present_mode_count, present_modes);
 	VkPresentModeKHR chosen_present_mode = present_modes[0];
 	for(u32 i = 0; i < present_mode_count; i++)

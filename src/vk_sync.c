@@ -14,7 +14,7 @@ GraphicsFence create_graphics_fence(GraphicsDevice *device, b32 signaled)
 
 GraphicsFence* create_graphics_fences(Arena *arena, GraphicsDevice *device, u32 count, b32 signaled)
 {
-	arena_push_type(arena, 0, count, GraphicsFence, fences);
+	arena_push_name(arena, 0, count, GraphicsFence, fences);
 	for(u32 i = 0; i < count; i++){fences[i] = create_graphics_fence(device, signaled);};
 	return fences;
 }
@@ -37,7 +37,7 @@ void wait_for_graphics_fence(GraphicsFence fence)
 void wait_for_graphics_fences(u32 count, GraphicsFence *fences)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, count, VkFence, handles);
+	arena_push_name(scratch.arena, 0, count, VkFence, handles);
 	for(u32 i = 0; i < count; i++){handles[i] = fences[i].handle;}
 	vkWaitForFences(fences[0].device->handle, count, handles, VK_TRUE, U64_MAX);
 	regress_scratch(scratch);
@@ -50,7 +50,7 @@ void reset_graphics_fence(GraphicsFence fence)
 void reset_graphics_fences(u32 count, GraphicsFence *fences)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, count, VkFence, fence_handles);
+	arena_push_name(scratch.arena, 0, count, VkFence, fence_handles);
 	for(u32 i = 0; i < count; i++){fence_handles[i] = fences[i].handle;};
 	vkResetFences(fences[0].device->handle, count, fence_handles);
 	regress_scratch(scratch);
@@ -63,7 +63,7 @@ void wait_and_reset_graphics_fence(GraphicsFence fence)
 void wait_and_reset_graphics_fences(u32 count, GraphicsFence *fences)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, count, VkFence, fence_handles);
+	arena_push_name(scratch.arena, 0, count, VkFence, fence_handles);
 	for(u32 i = 0; i < count; i++){fence_handles[i] = fences[i].handle;};
 	vkWaitForFences(fences[0].device->handle, count, fence_handles, VK_TRUE, U64_MAX);
 	vkResetFences(fences[0].device->handle, count, fence_handles);
@@ -82,7 +82,7 @@ GraphicsSemaphore create_graphics_semaphore(GraphicsDevice *device)
 
 GraphicsSemaphore* create_graphics_semaphores(Arena *arena, GraphicsDevice *device, u32 count)
 {
-	arena_push_type(arena, 0, count, GraphicsSemaphore, semaphores);
+	arena_push_name(arena, 0, count, GraphicsSemaphore, semaphores);
 	for(u32 i = 0; i < count; i++){semaphores[i] = create_graphics_semaphore(device);};
 	return semaphores;
 }

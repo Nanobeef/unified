@@ -8,6 +8,7 @@ VkBool32 vulkan_debug_callback(
 // The following errors only happen on newer api verions. Swapchain stuff
    if(data->messageIdNumber == 1461184347){return VK_FALSE;}
    if(data->messageIdNumber == 1402107823){return VK_FALSE;}
+   if(data->messageIdNumber == -978265390){return VK_FALSE;} // Swapchain resize must wait on vkQueueWaitIdle but some GPUs do not have more than 1 queue. The answer would be to use an extension on those gpus.
 
 	switch(severity)
 	{
@@ -20,6 +21,13 @@ VkBool32 vulkan_debug_callback(
 	}break;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:{
 		printf("VULKAN ERROR:\n    %s\n", data->pMessage);
+	}break;
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:{
+		char *c = strstr(data->pMessage, "DebugPrintf:") + 13;
+		if(data->messageIdNumber == 1340210937)
+		{
+			printf("%s", c);
+		}
 	}break;
 	default:
 	break;
@@ -50,6 +58,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 
 		VkValidationFeatureEnableEXT enabled_validation[] = {
 			VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+			VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
 		};
 		VkValidationFeatureDisableEXT disabled_validation[] = {
 			VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT,
@@ -67,7 +76,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 
 		VkInstanceCreateInfo info = {
 			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-//			.pNext = &validation_features,
+			.pNext = &validation_features,
 			.pApplicationInfo = &appinfo,
 #ifdef DEBUG
 			.enabledLayerCount = Arrlen(layers),
@@ -85,7 +94,8 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,	
 			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT,
     		.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,

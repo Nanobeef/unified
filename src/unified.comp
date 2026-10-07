@@ -10,93 +10,130 @@
 */
 
 
-layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+// When I was reasoning through the prefix-sum algorithm, there was a specific reason to use u16x2 rather than u32 when accumulating the counters in shared memory 4096*4 (16KiB). I forget why.
 
-layout(set = 0, binding = 0) writeonly uniform image2D target;
 
-layout(set = 0, binding = 1) readonly  buffer TargetBuffers{
-	uvec2 data[];	
+//layout(constant_id = 0) const u32 timestamp_period = 10;
+const u32 timestamp_period = 10;
+
+u64 get_time_ns() {return clockRealtimeEXT() * timestamp_period;}
+
+
+// Per Render Descriptors
+layout(set = 0, binding = 0, std140) uniform RenderGlobals{
+	mat3x3 world_affine;
+	mat3x3 overlay_affine;
+	float world_zoom;
+	float overlay_zoom;
+
+	uint frame_accum;
+}render_globals[2];
+
+layout(set = 0, binding = 1) writeonly uniform image2D target_images[2];
+
+
+// Per Update Descriptors
+layout(set = 1, binding = 0, std140) uniform UpdateGlobals{
+	vec2 box[2];
+	uint particle_count;
+	uint update_accum;
+}update_globals[2];
+
+layout(set = 1, binding = 1) buffer TargetBuffers{
+	vec2 data[];	
 }target_buffers[2];
 
-layout(set = 0, binding = 1) readonly  buffer ScratchBuffers{
+layout(set = 1, binding = 2) readonly buffer ScratchBuffers{
 	uvec2 data[];	
 }scratch_buffers[2];
 
-layout(set = 0, binding = 1) readonly  buffer CounterBuffers{
+layout(set = 1, binding = 3) readonly buffer CounterBuffers{
 	uvec2 data[];	
 }counter_buffers[2];
 
-layout(set = 0, binding = 1) readonly  buffer OffsetBuffers{
+layout(set = 1, binding = 4) readonly buffer OffsetBuffers{
 	uvec2 data[];	
-}offset_buffsers[2];
-
-layout(push_constant) uniform PushConstant{
-	mat3x3 affine;
-	uint time_us;
-	uint frame_accum;
-	float zoom;
-	uint particle_count;
-}pc;
+}offset_buffers[2];
 
 
-#ifdef DRAW
+
+#ifdef RESET
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-	uvec2 tid = gl_GlobalInvocationID.xy;
-	uvec2 target_size = imageSize(target);
-	vec2 pixel = ((vec2(tid) / target_size) - 0.5) * 2.0;
-	pixel = (vec3(pixel,1.0) * pc.affine).xy;
-	pixel.y = -pixel.y;
+	uint tid = gl_GlobalInvocationID.x;
+	uint thread_count = 32 * gl_NumWorkGroups.x;
 
-	vec2 pixel_size = 0.5 * pc.zoom / target_size;
-
-	uint rs = romu_mono_init((tid.x + tid.y * gl_NumWorkGroups.x * 32) * pc.frame_accum);
-
-	uint circle_count = 100;
-
-	float sample_accum = 0;
-	vec2 offset = vec2(
-		romu_mono_float(rs),
-		romu_mono_float(rs)
-	) * pixel_size;
-
-	float color = 0.0;
-	uint rs_static = romu_mono_init(12123);
-	for(uint j = 0; j < circle_count; j++)
+	uint particle_count = update_globals[0].particle_count;
+	uint iterations = particle_count / thread_count + 1;
+	for(uint i = 0; i < iterations; i++)
 	{
-		Circle c = random_circle(rs_static);
-		vec2 pos = c.position;;
-		float radius = c.radius;
-		float sd = sd_circle(offset + pixel + pos, radius);
-		color = min(color, sd);
+		uint index = i * thread_count + tid;	
+		if(index < particle_count)
+		{
+			uint rm = romu_mono_init(index);
+			vec2 p = vec2(
+				romu_mono_float(rm),
+				romu_mono_float(rm)
+			);
+		target_buffers[0].data[index] = p;
+		}
 	}
-
-	color = smoothstep(0.0, -pixel_size.y * 16.0, color);
-	imageStore(target, ivec2(tid), vec4(color));
 }
 
-#endif // DRAW
+#endif
 
 #ifdef COUNT 
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+
 void main()
 {
+	
 }
 #endif // COUNT 
 
 #ifdef PREFIX
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
 }
 #endif // PREFIX 
 
 #ifdef FILL
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
 }
 #endif // FILL 
 
 #ifdef RESOLVE 
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
 }
 #endif // RESOLVE 
+
+#ifdef DRAW
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+void main()
+{
+	u64 time = get_time_ns();
+	u32x2 tid = gl_GlobalInvocationID.xy;
+	u32x2 target_size = imageSize(target_images[0]);
+
+	if(tid.x > target_size.x || tid.y > target_size.y)
+	{
+		return;
+	}
+
+	f32x4 color = f32x4(1.0, 0.0, 0.0, 1.0);
+	imageStore(target_images[0], s32x2(tid), color);
+	time = get_time_ns() - time;
+	if(tid.x + tid.y == 0)
+	{
+		debugPrintfEXT("%lu ns\n", time);
+	}
+
+}
+#endif // DRAW

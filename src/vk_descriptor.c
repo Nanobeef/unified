@@ -31,7 +31,7 @@ void destroy_graphics_descriptor_set_layout(GraphicsDescriptorSetLayout layout)
 
 GraphicsDescriptorPool* create_graphics_descriptor_pool(Arena *arena, GraphicsDevice *device, u32 layout_count, GraphicsDescriptorSetLayout *layouts)
 {
-	arena_push_type(arena, 0, 1, GraphicsDescriptorPool, pool);
+	arena_push_name(arena, 0, 1, GraphicsDescriptorPool, pool);
 	*pool = (GraphicsDescriptorPool){
 		.device = device,
 		.set_count = layout_count,
@@ -57,7 +57,7 @@ GraphicsDescriptorPool* create_graphics_descriptor_pool(Arena *arena, GraphicsDe
 	}
 
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, pool_size_count, VkDescriptorPoolSize, pool_sizes);
+	arena_push_name(scratch.arena, 0, pool_size_count, VkDescriptorPoolSize, pool_sizes);
 	u32 pool_index = 0;
 	for(u32 i = 0; i < Arrlen(temp_layout.pool_sizes); i++)
 	{
@@ -80,12 +80,12 @@ GraphicsDescriptorPool* create_graphics_descriptor_pool(Arena *arena, GraphicsDe
 	VK_ASSERT(vkCreateDescriptorPool(device->handle, &info, vkb, &pool->handle));
 	
 	pool->descriptor_sets = arena_push(arena, 0, sizeof(GraphicsDescriptorSet) * layout_count);
-	arena_push_type(scratch.arena, 0, layout_count, VkDescriptorSetLayout, layout_handles);
+	arena_push_name(scratch.arena, 0, layout_count, VkDescriptorSetLayout, layout_handles);
 	for(u32 i = 0; i < layout_count; i++)
 	{
 		layout_handles[i] = layouts[i].handle;
 	}
-	arena_push_type(scratch.arena, 0, layout_count, VkDescriptorSet, set_handles);
+	arena_push_name(scratch.arena, 0, layout_count, VkDescriptorSet, set_handles);
 	for(u32 i = 0; i < layout_count; i++)
 	{
 		VkDescriptorSetAllocateInfo alloc_info = {
@@ -110,7 +110,7 @@ GraphicsDescriptorPool* create_graphics_descriptor_pool(Arena *arena, GraphicsDe
 void destroy_graphics_descriptor_pool(GraphicsDescriptorPool *pool)
 {
 	Scratch scratch = find_scratch(0,0,0);
-	arena_push_type(scratch.arena, 0, pool->set_count, VkDescriptorSet, set_handles);
+	arena_push_name(scratch.arena, 0, pool->set_count, VkDescriptorSet, set_handles);
 	for(u32 i = 0; i < pool->set_count; i++)
 	{
 		set_handles[i] = pool->descriptor_sets[i].handle;

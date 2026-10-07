@@ -17,7 +17,7 @@ typedef struct{
 	Thread *thread;
 	Mutex mutex;
 	Semaphore semaphore;
-	b32 run_thread;
+	atomic b32 run_thread;
 
 
 

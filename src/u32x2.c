@@ -156,3 +156,7 @@ u32 u32x2_distance(u32x2 v0, u32x2 v1)
 	return dst;
 }
 
+b32 u32x2_equal(u32x2 a, u32x2 b)
+{
+	return (a.x == b.x) && (a.y == b.y);
+}

@@ -34,6 +34,7 @@
 	#include "info.h"
 	#include "random.h"
 
+
 Arena *main_arena;
 Thread *main_thread;
 Mutex thread_table_mutex;
@@ -41,6 +42,7 @@ u32 max_thread_count = 1024;
 u64 physical_thread_count = 1;
 Thread **thread_table;
 u64 epoch_time_ns;
+
 
 // SURFACE
 	#include "window.h"
@@ -59,20 +61,13 @@ u64 epoch_time_ns;
 	#include "vk_queue.h"
 	#include "vk_descriptor.h"
 	#include "vk_pipeline.h"
-	#include "vk_font.h"
-	#include "vk_vertex_buffer.h"
-	#include "vk_draw.h"
 	#include "vk_query.h"
-	#include "ui.h"
 
 // AUDIO 
 	#include <alsa/asoundlib.h>
 	#include "audio.h"
 
-// PILE
-	#include "pile.h"
 
-	#include "boid.h"
 
 // GRAPHICS
 	#include "vk_instance.c"
@@ -89,12 +84,8 @@ u64 epoch_time_ns;
 	#include "vk_pipeline.c"
 	#include "vk_compute.c"
 	#include "camera.c"
-	#include "vk_vertex_buffer.c"
-	#include "vk_font.c"
 	#include "vk_descriptor.c"
-	#include "vk_draw.c"
 	#include "vk_query.c"
-	#include "ui.c"
 
 // BASE
 	#include "string.c"
@@ -112,10 +103,7 @@ u64 epoch_time_ns;
 // AUDIO 
 	#include "audio.c"
 
-// PILE
-	#include "pile.c"
 
- 	#include "boid.c"
 
 	
 #include "font.h"
@@ -125,7 +113,6 @@ u64 epoch_time_ns;
 #include "perfground.h"
 #include "perfground.c"
 
-#include "run_boids.c"
 #include "run_unified.c"
 
 void init(void)
@@ -154,54 +141,6 @@ void cleanup(void)
 	exit(0);
 }
 
-void rng_test()
-{
-	RomuQuad rq = romu_quad_seed(5354);
-	u64 n = MiB(128);
-	u64 *dst  = malloc(n * sizeof(u64));
-
-
-	// First few itterations for warm up.
-
-	for(u32 j = 0; j < 100; j++)
-	{
-		u64 elapsed = get_time_ns();
-
-		for(u64 i = 0; i < n; i++)
-		{
-			if(1)
-			{
-				dst[i] = romu_quad(&rq);		
-			}
-			else
-			{
-				u16 temp[4];
-				for(u32 k = 0; k < 4; k++)
-				{
-					temp[k] = rand();	
-				}
-				memcpy(dst + i, temp, 8);
-			}
-		}
-
-		elapsed = get_time_ns() - elapsed;
-		f64 rate = (f64)n / (f64)elapsed;
-		rate *= 8.0;
-
-		print("Itteration %u32\n\t%u64 in %t\n\t%f64 bytes / ns\n", j,n, elapsed, rate);
-
-	}
-
-
-	// Set 'a' so results are not optimized out.
-	u64 a = 0;
-
-	for(u64 i = 0; i < n; i++)
-	{
-		a += dst[i];		
-	}
-	print("%u64\n", a);
-}
 
 s32 main()
 {

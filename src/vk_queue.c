@@ -5,11 +5,11 @@ void submit_command_buffers(GraphicsDeviceQueue queue, u32 wait_count, GraphicsS
 {
 	Scratch scratch = find_scratch(0,0,0);
 
-	arena_push_type(scratch.arena, true, wait_count, VkSemaphore, wait_semaphore_handles);
+	arena_push_name(scratch.arena, true, wait_count, VkSemaphore, wait_semaphore_handles);
 	for(u32 i = 0; i < wait_count; i++){wait_semaphore_handles[i] = wait_semaphores[i].handle;}
-	arena_push_type(scratch.arena, true, signal_count, VkSemaphore, signal_semaphore_handles);
+	arena_push_name(scratch.arena, true, signal_count, VkSemaphore, signal_semaphore_handles);
 	for(u32 i = 0; i < signal_count; i++){signal_semaphore_handles[i] = signal_semaphores[i].handle;}
-	arena_push_type(scratch.arena, true, command_buffer_count, VkCommandBuffer, command_buffer_handles);
+	arena_push_name(scratch.arena, true, command_buffer_count, VkCommandBuffer, command_buffer_handles);
 	for(u32 i = 0; i < command_buffer_count; i++){command_buffer_handles[i] = command_buffers[i].handle;}
 
 	if(wait_stages == 0)
@@ -37,12 +37,12 @@ void present_swapchain(GraphicsDeviceQueue queue, u32 wait_count, GraphicsSemaph
 {
 	Scratch scratch = find_scratch(0,0,0);
 
-	arena_push_type(scratch.arena, true, swapchain_count, VkResult, results);
-	arena_push_type(scratch.arena, true, swapchain_count, u32, image_indices);
+	arena_push_name(scratch.arena, true, swapchain_count, VkResult, results);
+	arena_push_name(scratch.arena, true, swapchain_count, u32, image_indices);
 	for(u32 i = 0; i < swapchain_count; i++){image_indices[i] = swapchains[i].image_index;}
-	arena_push_type(scratch.arena, true, swapchain_count, VkSwapchainKHR, swapchain_handles);
+	arena_push_name(scratch.arena, true, swapchain_count, VkSwapchainKHR, swapchain_handles);
 	for(u32 i = 0; i < swapchain_count; i++){swapchain_handles[i] = swapchains[i].handle;}
-	arena_push_type(scratch.arena, true, wait_count, VkSemaphore, semaphore_handles);
+	arena_push_name(scratch.arena, true, wait_count, VkSemaphore, semaphore_handles);
 	for(u32 i = 0; i < wait_count; i++){semaphore_handles[i] = semaphores[i].handle;}
 
 	VkPresentInfoKHR info = {

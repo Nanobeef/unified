@@ -43,7 +43,7 @@ typedef struct Thread{
 
 	void *ui_data;
 
-	atomic void *data;
+	atomic u64 data;
 
 	Semaphore working_semaphore;
 	Semaphore idling_semaphore;

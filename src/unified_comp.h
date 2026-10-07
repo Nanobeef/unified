@@ -1,5 +1,73 @@
 
 
+
+
+#define f16 float16_t
+#define f32 float32_t
+#define f64 float64_t
+
+#define u8 uint8_t
+#define u16 uint16_t
+#define u32 uint32_t
+#define u64 uint64_t
+
+#define s8 int8_t
+#define s16 int16_t
+#define s32 int32_t
+#define s64 int64_t
+
+#define f16x2 f16vec2
+#define f32x2 f32vec2
+#define f64x2 f64vec2
+
+#define u8x2 u8vec2
+#define u16x2 u16vec2
+#define u32x2 u32vec2
+#define u64x2 u64vec2
+
+#define s8x2 i8vec2
+#define s16x2 i16vec2
+#define s32x2 i32vec2
+#define s64x2 i64vec2
+
+#define f16x3 f16vec3
+#define f32x3 f32vec3
+#define f64x3 f64vec3
+
+#define u8x3 u8vec3
+#define u16x3 u16vec3
+#define u32x3 u32vec3
+#define u64x3 u64vec3
+
+#define s8x3 i8vec3
+#define s16x3 i16vec3
+#define s32x3 i32vec3
+#define s64x3 i64vec3
+
+#define f16x4 f16vec4
+#define f32x4 f32vec4
+#define f64x4 f64vec4
+
+#define u8x4 u8vec4
+#define u16x4 u16vec4
+#define u32x4 u32vec4
+#define u64x4 u64vec4
+
+#define s8x4 i8vec4
+#define s16x4 i16vec4
+#define s32x4 i32vec4
+#define s64x4 i64vec4
+
+#define f32m3 f32mat3x3
+#define f32m2 f32mat2x2
+
+#extension GL_EXT_shader_explicit_arithmetic_types : enable
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_shader_realtime_clock : enable
+
+
+
+
 #define Arrlen(X) (sizeof((X)[0]) / sizeof(X))
 
 uint splitmix32(inout uint state)
