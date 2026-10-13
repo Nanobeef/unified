@@ -2,7 +2,6 @@
 
 
 typedef struct{
-	f32x2 box[2];
 	u32 particle_count;
 	u32 update_accum;
 }UpdateGlobals;
@@ -15,6 +14,19 @@ typedef struct{
 
 	u32 frame_accum;
 }RenderGlobals;
+
+
+void cmd_general_compute_memory_barrier(GraphicsCommandBuffer cb)
+{
+	VkMemoryBarrier barrier = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+	};
+	vkCmdPipelineBarrier(cb.handle, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0,0, 0,0);
+}
+	
+
 
 void update_pingpong_descriptor_target_images(GraphicsDescriptorPool *pool, u32 binidng, GraphicsDeviceImage* render_target_images)
 {
@@ -61,8 +73,8 @@ s32 run_unified(void)
 	Window *window = create_window(main_arena);
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
-//	GraphicsDevice *device = create_graphics_device(main_arena, instance, INTEGRATED_GRAPHICS_DEVICE);
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, INTEGRATED_GRAPHICS_DEVICE);
+//	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
@@ -119,7 +131,7 @@ s32 run_unified(void)
 
 	u32 hardware_wave_count = 1024;
 
-	u32 max_target_buffer_count = MiB(1);
+	u32 max_target_buffer_count = MiB(30);
 	u32 target_buffer_count = max_target_buffer_count;
 	u32 target_buffer_size = max_target_buffer_count * sizeof(u16x2);
 	u32 scratch_buffer_size = 4096 * hardware_wave_count * sizeof(u32);
@@ -138,7 +150,7 @@ s32 run_unified(void)
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_offset_buffers);
 	for(u32 i = 0; i < frame_count; i++)
 	{
-		render_globals[i] = create_graphics_device_buffer(device->host_cached_heap, sizeof(RenderGlobals), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		render_globals[i] = create_graphics_device_buffer(device->host_coherent_heap, sizeof(RenderGlobals), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		render_target_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT);
 
 		update_globals[i] = create_graphics_device_buffer(device->host_cached_heap, sizeof(UpdateGlobals), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
@@ -379,6 +391,11 @@ s32 run_unified(void)
 		regress_scratch(scratch);
 	}
 
+	GraphicsQueryPool query_pools[frame_count];
+	for(u32 i = 0; i < frame_count; i++)
+	{
+		query_pools[i] = create_graphics_query_pool(main_arena, device, VK_QUERY_TYPE_TIMESTAMP, 1024, 0);
+	}
 
 
 
@@ -442,7 +459,7 @@ s32 run_unified(void)
 			swapchain = recreate_graphics_swapchain(resize_arena, swapchain);
 			for(u32 i = 0; i < frame_count; i++)
 			{
-				render_target_images[i] = resize_graphics_device_image(render_target_images[i], swapchain.size);
+				render_target_images[i] = resize_graphics_device_image(render_target_images[i], u32x2_div1(swapchain.size, 10));
 			}
 			update_pingpong_descriptor_target_images(render_descriptor_pool, 1, render_target_images);
 
@@ -463,9 +480,21 @@ s32 run_unified(void)
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
 
 
+		
+		if(pe.a.pressed){
+			TimestampQueryResult *qr = get_graphics_timestamp_query_pool_results(frame_arena, query_pools[frame_index]);
+			for(u32 i = 0; i < TOTAL(qr); i++)
+			{
+				print("%s, %t\n", qr[i].name, qr[i].elapsed);
+			}
+
+		}
+
+
 
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+		cmd_reset_graphics_query_pool(cb, query_pools[frame_index]);
 
 
 		if((frame_accum - resize_frame_accum < swapchain.image_count))
@@ -506,39 +535,49 @@ s32 run_unified(void)
 
 
 
-		const u32 wave_size = 32;
+		const u32 wave_size = 64;
 		u32 resets_per_thread = 64;
 		u32 counts_per_thread = 64;
 
-		*(UpdateGlobals*)(render_globals[frame_index].memory.mapping) = (UpdateGlobals)
+		*(UpdateGlobals*)(update_globals[update_index].memory.mapping) = (UpdateGlobals)
 		{
 			.update_accum = (u32)update_accum,
 			.particle_count = target_buffer_count,
 		};
 
+		
 
 		// Reset
 		if(pe.r.pressed || (frame_accum == 0))
 		{
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("RESET"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			u32 dispatch_size = target_buffer_count / (wave_size * resets_per_thread);
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, reset_pipeline);
 			vkCmdDispatch(cb.handle, dispatch_size, 1,1);
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("RESET"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		// Count
+		cmd_general_compute_memory_barrier(cb);
 		{
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("COUNT"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			u32 dispatch_size = target_buffer_count / (wave_size * counts_per_thread);
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, count_pipeline);
 			vkCmdDispatch(cb.handle, dispatch_size, 1,1);
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("COUNT"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		// Prefix 
+		cmd_general_compute_memory_barrier(cb);
 		{
 		}
 		// Fill
+		cmd_general_compute_memory_barrier(cb);
 		{
 		}
 		// Resolve
+		cmd_general_compute_memory_barrier(cb);
 		{
 		}
+		cmd_general_compute_memory_barrier(cb);
 		// Draw
 		{
 			u32x2 dispatch_size = u32x2_set(
@@ -560,6 +599,7 @@ s32 run_unified(void)
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, draw_pipeline);
 			vkCmdDispatch(cb.handle, dispatch_size.x, dispatch_size.y,1);
 		}
+		cmd_general_compute_memory_barrier(cb);
 
 		{
 			GraphicsImageMemoryBarrier image_barriers[2] = {
@@ -626,6 +666,11 @@ s32 run_unified(void)
 	}
 
 	vkDeviceWaitIdle(device->handle);
+
+	for(u32 i = 0; i < frame_count; i++)
+	{
+		destroy_graphics_query_pool(query_pools[frame_index]);
+	}
 
 	vkDestroyPipeline(device->handle, reset_pipeline, vkb);;
 	vkDestroyPipeline(device->handle, count_pipeline, vkb);;

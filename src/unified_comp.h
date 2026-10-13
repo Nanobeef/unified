@@ -66,7 +66,9 @@
 #extension GL_EXT_shader_realtime_clock : enable
 
 
-
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
+#extension GL_NV_shader_subgroup_partitioned : enable
 
 #define Arrlen(X) (sizeof((X)[0]) / sizeof(X))
 
@@ -82,29 +84,46 @@ uint splitmix32(inout uint state)
 	return s;
 }
 
-// https://www.romu-random.org
-#define ROMU_ROTL32(d, l) ((d<<(l)) |  (d>>(8*4-(l))))
 
-uint romu_mono_init(uint seed)
-{
-	seed = splitmix32(seed);
-	return (seed & 0x1fffffffu) + 1156979152u;
+uint lowbias32(uint x) {
+    x ^= x >> 16u;
+    x *= 0x7feb352du;
+    x ^= x >> 15u;
+    x *= 0x846ca68bu;
+    x ^= x >> 16u;
+    return x;
 }
 
-// Only use the low 16 bits
-uint romu_mono(inout uint state)
+// https://www.romu-random.org
+#define ROMU_ROTL32(d,lrot) ((d<<(lrot)) | (d>>(8*4-(lrot))))
+
+u16 romu_mono(inout u32 state)
 {
-	uint result = state >> 16;
+	u16 result = u16(state >> 16);
 	state *= 3611795771u;
 	state = ROMU_ROTL32(state, 12);
 	return result;
 }
 
-float romu_mono_float(inout uint state)
+u32 romu_mono_init(u32 seed)
 {
-	uint high = romu_mono(state) & 0x0000FFFF;
-	uint low = romu_mono(state) & 0x0000FFFF;
-	uint data = (low) | (high << 16);
+	seed = (seed & 0x1fffffffu) + 1156979152u;
+	romu_mono(seed);
+	return seed;
+}
+
+
+u32 romu_mono_u32(inout u32 state)
+{
+	u32 high = romu_mono(state);
+	u32 low = romu_mono(state);
+	u32 data = (low) | (high << 16);
+	return data;
+}
+
+f32 romu_mono_f32(inout u32 state)
+{
+	u32 data = romu_mono_u32(state);
 	data &= 0x007FFFFF;
 	data |= 0x40000000;
 	return uintBitsToFloat(data) - 3.0f;
@@ -153,17 +172,17 @@ float sd_heart( in vec2 p )
 struct Circle{
 	vec2 position;
 	float radius;
-	uint data;
+	u32 data;
 };
 
-Circle random_circle(inout uint rs)
+Circle random_circle(inout u32 rs)
 {
 	Circle c;
 	c.position = vec2(
-		romu_mono_float(rs),
-		romu_mono_float(rs)
+		romu_mono_f32(rs),
+		romu_mono_f32(rs)
 	);
-	c.radius = abs(romu_mono_float(rs)) / 100;
+	c.radius = abs(romu_mono_f32(rs)) / 100;
 	c.radius = max(c.radius, 0.005);
 	c.data = romu_mono(rs);
 	return c;

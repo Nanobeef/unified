@@ -1,0 +1,177 @@
+#version 450 core
+#pragma shader_stage(compute)
+
+#include "unified_comp.h"
+
+
+// Implicit entrypoint macros 
+/*
+		
+*/
+
+
+// When I was reasoning through the prefix-sum algorithm, there was a specific reason to use u16x2 rather than u32 when accumulating the counters in shared memory 4096*4 (16KiB). I forget why.
+
+
+//layout(constant_id = 0) const u32 timestamp_period = 10;
+const u32 timestamp_period = 10;
+layout(const_id = 0) const u32 shared_buffer_size = 1024;
+
+u64 get_time_ns() {return clockRealtimeEXT() * timestamp_period;}
+
+
+// Per Render Descriptors
+layout(set = 0, binding = 0, std140) uniform RenderGlobals{
+	mat3x3 world_affine;
+	mat3x3 overlay_affine;
+	float world_zoom;
+	float overlay_zoom;
+
+	uint frame_accum;
+}render_globals[2];
+
+layout(set = 0, binding = 1) writeonly uniform image2D target_images[2];
+
+
+// Per Update Descriptors
+layout(set = 1, binding = 0, std140) uniform UpdateGlobals{
+	uint particle_count;
+	uint update_accum;
+}update_globals[2];
+
+layout(set = 1, binding = 1) buffer TargetBuffers{
+	u32x2 data[];	
+}target_buffers[2];
+
+layout(set = 1, binding = 2) readonly buffer ScratchBuffers{
+	u32x2 data[];	
+}scratch_buffers[2];
+
+layout(set = 1, binding = 3) readonly buffer CounterBuffers{
+	u32x2 data[];	
+}counter_buffers[2];
+
+layout(set = 1, binding = 4) readonly buffer OffsetBuffers{
+	u32x2 data[];	
+}offset_buffers[2];
+
+
+
+#ifdef RESET
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+	uint tid = gl_GlobalInvocationID.x;
+	uint thread_count = 32 * gl_NumWorkGroups.x;
+
+	uint particle_count = update_globals[0].particle_count;
+	uint iterations = particle_count / thread_count + 1;
+	for(uint i = 0; i < iterations; i++)
+	{
+		uint index = i * thread_count + tid;	
+		if(index < particle_count)
+		{
+			u32 rm = romu_mono_init(lowbias32(tid + 1) + update_globals[0].update_accum);
+			romu_mono_u32(rm);
+			u32x2 p;
+			p.x = romu_mono_u32(rm);
+			p.y = romu_mono_u32(rm);
+			target_buffers[0].data[index] = target_buffers[1].data[index] = p;
+		}
+	}
+}
+
+#endif
+
+#ifdef COUNT 
+#define WAVE_SIZE 32
+layout(local_size_x = WAVE_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+
+shared u32 shared_counters[1024];
+
+void main()
+{
+
+	u64 time = get_time_ns();
+	u32 lane = gl_LocalInvocationID.x;
+	for(u32 i = lane * 4; i < 1024; i+=WAVE_SIZE)
+	{
+		shared_counters[i] = 0;
+		shared_counters[i+1] = 0;
+		shared_counters[i+2] = 0;
+		shared_counters[i+3] = 0;
+	}
+
+	barrier();
+
+	uint particle_count = (update_globals[0].particle_count / gl_NumWorkGroups.x) + 1;
+	uint first_particle = particle_count * gl_WorkGroupID.x;
+	for(uint i = lane; i < particle_count; i+=WAVE_SIZE)
+	{
+		u32x2 upos = target_buffers[0].data[i + first_particle];
+		upos.x >>= 26;
+		upos.y >>= 26;
+		u32 counter_index = upos.y * 64 + upos.x;
+		//atomicAdd(shared_counters[counter_index], 1);
+	}
+
+	barrier();
+	time = get_time_ns() - time;
+	if(gl_GlobalInvocationID.x == 0)
+	{
+		debugPrintfEXT("TIME = %lu\n",	time);
+	}
+
+	if(gl_WorkGroupID.x == 0 )
+	{
+		for(u32 i = lane; i < 1024; i+= WAVE_SIZE)
+		{
+			u32 index = i;
+			u32 c = shared_counters[index];
+			u32x2 p = u32x2(index % 32, index / 32);
+			f32 color = f32(c) / 10.0;
+			imageStore(target_images[0], s32x2(p), vec4(color));
+		}
+	}
+}
+#endif // COUNT 
+
+#ifdef PREFIX
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+}
+#endif // PREFIX 
+
+#ifdef FILL
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+}
+#endif // FILL 
+
+#ifdef RESOLVE 
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+}
+#endif // RESOLVE 
+
+#ifdef DRAW
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+void main()
+{
+	u32x2 tid = gl_GlobalInvocationID.xy;
+	u32x2 target_size = imageSize(target_images[0]);
+
+	if(tid.x > target_size.x || tid.y > target_size.y)
+	{
+		return;
+	}
+
+	f32x4 color = f32x4(1.0, 0.0, 0.0, 1.0);
+	//imageStore(target_images[0], s32x2(tid), color);
+
+}
+#endif // DRAW
