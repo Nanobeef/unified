@@ -13,9 +13,6 @@
 // When I was reasoning through the prefix-sum algorithm, there was a specific reason to use u16x2 rather than u32 when accumulating the counters in shared memory 4096*4 (16KiB). I forget why.
 
 
-
-
-
 layout(constant_id = 0) const u32 const_max_shared_buffer_size = 1024 * 4;
 layout(constant_id = 1) const u32 const_timestamp_period = 10;
 
@@ -56,8 +53,6 @@ layout(set = 1, binding = 3) readonly buffer CounterBuffers{
 layout(set = 1, binding = 4) readonly buffer OffsetBuffers{
 	u32x2 data[];	
 }offset_buffers[2];
-
-
 
 #ifdef RESET
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
@@ -115,7 +110,7 @@ void main()
 		shared_counters[lane][i+0] = 0;
 		shared_counters[lane][i+1] = 0;
 		shared_counters[lane][i+2] = 0;
-		shared_counters[lane][i+3] = 0;
+		f thshared_counters[lane][i+3] = 0;
 	}
 
 	barrier();
