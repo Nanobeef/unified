@@ -13,9 +13,8 @@
 // When I was reasoning through the prefix-sum algorithm, there was a specific reason to use u16x2 rather than u32 when accumulating the counters in shared memory 4096*4 (16KiB). I forget why.
 
 
-layout(constant_id = 0) const u32 const_max_shared_buffer_size = 1024 * 4;
-layout(constant_id = 1) const u32 const_timestamp_period = 10;
 
+layout(constant_id = 1) const u32 const_timestamp_period = 10;
 u64 get_time_ns() {return clockRealtimeEXT() * const_timestamp_period;}
 
 
@@ -27,55 +26,33 @@ layout(set = 0, binding = 0, std140) uniform RenderGlobals{
 	float overlay_zoom;
 
 	uint frame_accum;
-}render_globals[2];
+}render_globals;
 
-layout(set = 0, binding = 1) writeonly uniform image2D target_images[2];
+layout(set = 0, binding = 1) writeonly uniform image2D target_image;
 
 
 // Per Update Descriptors
 layout(set = 1, binding = 0, std140) uniform UpdateGlobals{
-	uint particle_count;
-	uint update_accum;
-}update_globals[2];
+	u32 particles_pointer;
+	u32 grid_offsets_pointer;
+	u32 grid_square_size;
+	u32 particle_count;
 
-layout(set = 1, binding = 1) buffer TargetBuffers{
-	u32x2 data[];	
-}target_buffers[2];
+	u32 update_accum;
+}update_globals;
 
-layout(set = 1, binding = 2) readonly buffer ScratchBuffers{
-	u32x2 data[];	
-}scratch_buffers[2];
+layout(set = 1, binding = 1) readonly buffer ReadBuffer{
+	uint data[];
+}read_buffer;
 
-layout(set = 1, binding = 3) readonly buffer CounterBuffers{
-	u32x2 data[];	
-}counter_buffers[2];
-
-layout(set = 1, binding = 4) readonly buffer OffsetBuffers{
-	u32x2 data[];	
-}offset_buffers[2];
+layout(set = 1, binding = 2) writeonly buffer WriteBuffer{
+	uint data[];
+}write_buffer;
 
 #ifdef RESET
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
-	uint tid = gl_GlobalInvocationID.x;
-	uint thread_count = 32 * gl_NumWorkGroups.x;
-
-	uint particle_count = update_globals[0].particle_count;
-	uint iterations = particle_count / thread_count + 1;
-	for(uint i = 0; i < iterations; i++)
-	{
-		uint index = i * thread_count + tid;	
-		if(index < particle_count)
-		{
-			u32 rm = romu_mono_init(lowbias32(tid + 1) + update_globals[0].update_accum);
-			romu_mono_u32(rm);
-			u32x2 p;
-			p.x = romu_mono_u32(rm);
-			p.y = romu_mono_u32(rm);
-			target_buffers[0].data[index] = target_buffers[1].data[index] = p;
-		}
-	}
 }
 
 #endif
@@ -85,65 +62,8 @@ void main()
 layout(local_size_x = WAVE_SIZE, local_size_y = 1, local_size_z = 1) in;
 
 
-
-
-shared u32 shared_counters[32][32];
-u32 counters[16];
-
-void increment_counter(uint index)
-{
-	u32 word = index >> 2;
-	u32 shift = (index & 3u) * 8u;
-	u32 value = bitfieldExtract(counters[word], s32(shift), 8);
-	value++;
-	counters[word] = bitfieldInsert(counters[word], value, int(shift), 8);
-
-}
-
 void main()
 {
-
-	u64 time = get_time_ns();
-	u32 lane = gl_LocalInvocationID.x;
-	for(u32 i = 0; i < 32; i+=4)
-	{
-		shared_counters[lane][i+0] = 0;
-		shared_counters[lane][i+1] = 0;
-		shared_counters[lane][i+2] = 0;
-		f thshared_counters[lane][i+3] = 0;
-	}
-
-	barrier();
-
-	uint particle_count = (update_globals[0].particle_count / gl_NumWorkGroups.x) + 1;
-	uint first_particle = particle_count * gl_WorkGroupID.x;
-	for(uint i = lane; i < particle_count; i+=WAVE_SIZE)
-	{
-		u32x2 upos = target_buffers[0].data[i + first_particle];
-		upos.x >>= 26;
-		upos.y >>= 26;
-		u32 counter_index = upos.y * 64 + upos.x;
-		//atomicAdd(shared_counters[counter_index], 1);
-	}
-
-	barrier();
-	time = get_time_ns() - time;
-	if(gl_GlobalInvocationID.x == 0)
-	{
-		debugPrintfEXT("TIME = %lu\n",	time);
-	}
-
-
-	if(gl_WorkGroupID.x == 0 )
-	{
-		for(u32 y = lane; y < 32; y++)
-		{
-			u32 c = shared_counters[y][lane];
-			u32x2 p = u32x2(lane, y);
-			f32 color = f32(c) / 10.0;
-			imageStore(target_images[0], s32x2(p), vec4(color));
-		}
-	}
 }
 #endif // COUNT 
 
@@ -165,6 +85,7 @@ void main()
 layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 void main()
 {
+	
 }
 #endif // RESOLVE 
 
@@ -172,16 +93,56 @@ void main()
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 void main()
 {
-	u32x2 tid = gl_GlobalInvocationID.xy;
-	u32x2 target_size = imageSize(target_images[0]);
 
-	if(tid.x > target_size.x || tid.y > target_size.y)
-	{
+
+	u32x2 pixel = gl_GlobalInvocationID.xy;
+	u32x2 image_size = imageSize(target_image);
+	vec2 pos = (vec2(pixel) / vec2(image_size) - 0.5) * 2.0;
+
+
+
+	if((pixel.x > image_size.x) || (pixel.y > image_size.y))
 		return;
+
+
+	f32x2 world_pos = (vec3(pos, 1.0) * render_globals.world_affine).xy;
+
+	if(world_pos.x < 1.0 && world_pos.x > -1.0 && world_pos.y < 1.0 && world_pos.y > -1.0)
+	{
+
+		u32x2 upos = u32x2(((world_pos / 2.0) + 0.5) * 4294967296.0);
+		upos.x >>= (32-6);
+		upos.y >>= (32-6);
+		u32 cell_index = upos.y * 64 + upos.x;
+		u32 counter_offset = 0 + update_globals.particle_count * 4;
+		u32 offset_offset = counter_offset + 4096;
+
+		u32 count = read_buffer.data[counter_offset + cell_index];
+
+		f32x4 color = vec4(f32(count) / 10.0, 0.0, 0.0, 1.0);
+		imageStore(target_image, s32x2(pixel), color);
+		
+
+		for(u32 i = 0; i < count; i++)
+		{
+			u32 cell_offset = read_buffer.data[offset_offset + cell_index];
+			u32 particle_offset = cell_offset * 4;
+			u32x2 uparticle_pos;
+			uparticle_pos.x = read_buffer.data[particle_offset + 0];
+			uparticle_pos.y = read_buffer.data[particle_offset + 1];
+			f32x2 particle_pos = ((f32x2(uparticle_pos) / 4294967296.0) - 0.5) * 2.0;
+
+			if(distance(world_pos, particle_pos) < 0.01)
+			{
+				vec4 color = f32x4(1.0);
+				imageStore(target_image, s32x2(pixel), color);
+			}
+		}
 	}
 
-	f32x4 color = f32x4(1.0, 0.0, 0.0, 1.0);
-	//imageStore(target_images[0], s32x2(tid), color);
+
+
+
 
 }
 #endif // DRAW

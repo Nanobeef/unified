@@ -8,7 +8,7 @@ elif [[ "$mode" = "detached" ]]; then
 	./unified $
 elif [[ "$mode" = "debug" ]]; then
 	~/dev/raddebugger/build/raddbg unified
-#   gdb unified
+  #gdb unified
 fi
 
 

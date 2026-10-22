@@ -1,8 +1,13 @@
 
+#include "particle_test_1.c"
 
 
 typedef struct{
+	u32 particles_pointer;
+	u32 grid_offsets_pointer;
+	u32 grid_square_size;
 	u32 particle_count;
+
 	u32 update_accum;
 }UpdateGlobals;
 
@@ -15,7 +20,6 @@ typedef struct{
 	u32 frame_accum;
 }RenderGlobals;
 
-
 void cmd_general_compute_memory_barrier(GraphicsCommandBuffer cb)
 {
 	VkMemoryBarrier barrier = {
@@ -26,40 +30,33 @@ void cmd_general_compute_memory_barrier(GraphicsCommandBuffer cb)
 	vkCmdPipelineBarrier(cb.handle, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0,0, 0,0);
 }
 	
-
-
-void update_pingpong_descriptor_target_images(GraphicsDescriptorPool *pool, u32 binidng, GraphicsDeviceImage* render_target_images)
+void update_descriptor_target_images(GraphicsDescriptorPool *pool, u32 binidng, GraphicsDeviceImage* render_target_images)
 {
-	u32 frame_count = 2;
+	const u32 frame_count = 2;
 	Scratch scratch = find_scratch(0,0,0);
 
-	u32 render_binding_count = 1;
-	u32 pingpong[2][2] = {{0,1},{1,0}};
-	arena_push_name(scratch.arena, 0, frame_count * render_binding_count, VkWriteDescriptorSet, writes);
+	
+	arena_push_name(scratch.arena, 0, frame_count, VkDescriptorImageInfo, images);
+	arena_push_name(scratch.arena, 0, frame_count, VkWriteDescriptorSet, writes);
 	for(u32 i = 0; i < frame_count ;i++)
 	{
-		arena_push_name(scratch.arena, 0, frame_count, VkDescriptorImageInfo, images);
-		for(u32 j = 0; j < frame_count; j++)
+		images[i] = (VkDescriptorImageInfo)
 		{
-			u32 k = pingpong[i][j];
-			images[j] = (VkDescriptorImageInfo)
-			{
-				.imageView= render_target_images[k].view,
-				.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-			};
-		}
-		writes[i * render_binding_count] = (VkWriteDescriptorSet)
+			.imageView= render_target_images[i].view,
+			.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+		};
+		writes[i] = (VkWriteDescriptorSet)
 		{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet = pool->descriptor_sets[i].handle,
 			.dstBinding = 1,
-			.descriptorCount = 2,
+			.descriptorCount = 1,
 			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-			.pImageInfo = images,
+			.pImageInfo = images + i,
 		};
 	}
 
-	vkUpdateDescriptorSets(pool->device->handle, frame_count * render_binding_count, writes,0,0);
+	vkUpdateDescriptorSets(pool->device->handle, frame_count, writes,0,0);
 	regress_scratch(scratch);
 	
 }
@@ -73,8 +70,7 @@ s32 run_unified(void)
 	Window *window = create_window(main_arena);
 	GraphicsInstance *instance = create_graphics_instance(main_arena);
 	GraphicsSurface surface = create_graphics_surface(window, instance);
-	GraphicsDevice *device = create_graphics_device(main_arena, instance, INTEGRATED_GRAPHICS_DEVICE);
-//	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
+	GraphicsDevice *device = create_graphics_device(main_arena, instance, 0);
 	GraphicsSwapchain swapchain = create_graphics_swapchain(main_arena, surface, device);
 
 	Event *event_ring_buffer = allocate_ring_buffer(main_arena, Event, 1024);
@@ -129,57 +125,38 @@ s32 run_unified(void)
 	Camera inspect_camera = init_camera();
 	FixedCamera fixed_camera = create_fixed_camera(window->size);
 
-	u32 hardware_wave_count = 1024;
-
-	u32 max_target_buffer_count = MiB(30);
-	u32 target_buffer_count = max_target_buffer_count;
-	u32 target_buffer_size = max_target_buffer_count * sizeof(u16x2);
-	u32 scratch_buffer_size = 4096 * hardware_wave_count * sizeof(u32);
-	u32 counter_buffer_size = 4096 * sizeof(u32);
-	u32 offset_buffer_size = 4096 * sizeof(u32x2);
-
+	u32 hardware_wave_count = 32;
 
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, render_globals);
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceImage, render_target_images);
 
+	u32 particle_count = 1024 * 10;
+	u64 update_buffer_size = particle_test1_buffer_size(particle_count);
 
+	GraphicsDeviceBuffer update_buffer = create_graphics_device_buffer(device->host_cached_heap,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_globals);
-	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_target_buffers);
-	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_scratch_buffers);
-	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_counter_buffers);
-	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_offset_buffers);
 	for(u32 i = 0; i < frame_count; i++)
 	{
 		render_globals[i] = create_graphics_device_buffer(device->host_coherent_heap, sizeof(RenderGlobals), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 		render_target_images[i] = create_graphics_device_image_explicit(device->device_heap, swapchain.size, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT| VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL, VK_SAMPLE_COUNT_1_BIT);
 
 		update_globals[i] = create_graphics_device_buffer(device->host_cached_heap, sizeof(UpdateGlobals), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		update_target_buffers[i] = create_graphics_device_buffer(device->device_heap, target_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-		update_scratch_buffers[i] = create_graphics_device_buffer(device->device_heap, scratch_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-		update_counter_buffers[i] = create_graphics_device_buffer(device->device_heap, counter_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-		update_offset_buffers[i] = create_graphics_device_buffer(device->device_heap, offset_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 	}
-
-
-
 
 
 	GraphicsDescriptorSetLayout render_descriptor_set_layout = {0};
 	{
 		VkDescriptorSetLayoutBinding bindings[] = {
-			{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
 		};
 		render_descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 	}
 	GraphicsDescriptorSetLayout update_descriptor_set_layout = {0};
 	{
 		VkDescriptorSetLayoutBinding bindings[] = {
-			{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frame_count, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
 		};
 		update_descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 	}
@@ -206,7 +183,7 @@ s32 run_unified(void)
 	GraphicsDescriptorPool *update_descriptor_pool = 0;
 	{
 		GraphicsDescriptorSetLayout set_layouts[frame_count];
-		for(u32 i = 0; i < frame_count; i++)
+		for(u32 i = 0; i < update_count; i++)
 		{
 			set_layouts[i] = update_descriptor_set_layout;
 		}
@@ -237,167 +214,85 @@ s32 run_unified(void)
 		);
 	}
 	{
-		Scratch scratch = find_scratch(0,0,0);
-
-		u32 render_binding_count = 2;
-		u32 pingpong[2][2] = {{0,1},{1,0}};
-		arena_push_name(scratch.arena, 0, frame_count * render_binding_count, VkWriteDescriptorSet, writes);
-		for(u32 i = 0; i < frame_count ;i++)
+		u32 write_count = frame_count * 2;
+		VkWriteDescriptorSet writes[write_count];
+		VkDescriptorBufferInfo uniform_buffer_infos[2];
+		VkDescriptorImageInfo target_image_infos[2];
+		for(u32 i = 0; i < frame_count; i++)
 		{
-			arena_push_name(scratch.arena, 0, frame_count, VkDescriptorBufferInfo, buffers);
-			arena_push_name(scratch.arena, 0, frame_count, VkDescriptorImageInfo, images);
-			for(u32 j = 0; j < frame_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j] = (VkDescriptorBufferInfo)
-				{
-					.buffer = render_globals[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-				images[j] = (VkDescriptorImageInfo)
-				{
-					.imageView= render_target_images[k].view,
-					.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
-				};
-			}
-			writes[i * render_binding_count + 0] = (VkWriteDescriptorSet)
-			{
+			uniform_buffer_infos[i] = (VkDescriptorBufferInfo){
+				.buffer = render_globals[i].handle,
+				.offset = 0,
+				.range = VK_WHOLE_SIZE,
+			};
+			target_image_infos[i] = (VkDescriptorImageInfo){
+				.imageView = render_target_images[i].view,
+				.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+			};
+			writes[i * 2] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 0,
-				.descriptorCount = 2,
 				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.pBufferInfo = buffers,
+				.dstBinding = 0,
+				.descriptorCount = 1,
+				.pBufferInfo = &uniform_buffer_infos[i],
 			};
-			writes[i * render_binding_count + 1] = (VkWriteDescriptorSet)
-			{
+			writes[i * 2 + 1] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 				.dstSet = render_descriptor_pool->descriptor_sets[i].handle,
 				.dstBinding = 1,
-				.descriptorCount = 2,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-				.pImageInfo = images,
+				.descriptorCount = 1,
+				.pImageInfo = &target_image_infos[i],
 			};
 		}
-
-		vkUpdateDescriptorSets(device->handle, frame_count * render_binding_count, writes,0,0);
-		regress_scratch(scratch);
+		vkUpdateDescriptorSets(device->handle, write_count, writes, 0,0);
 	}
 
 
 	{
-		Scratch scratch = find_scratch(0,0,0);
-
-		u32 update_binding_count = 5;
-		u32 pingpong[2][2] = {{0,1},{1,0}};
-		arena_push_name(scratch.arena, 0, update_count * update_binding_count, VkWriteDescriptorSet, writes);
-		for(u32 i = 0; i < frame_count ;i++)
+		u32 write_count = update_count * 2;
+		VkWriteDescriptorSet writes[write_count];
+		VkDescriptorBufferInfo uniform_buffer_infos[2];
+		VkDescriptorBufferInfo storage_buffer_infos[2];
+		for(u32 i = 0; i < update_count; i++)
 		{
-			arena_push_name(scratch.arena, 0, update_count * 5, VkDescriptorBufferInfo, buffers);
-			//arena_push_name(scratch.arena, 0, update_count, VkDescriptorImageInfo, images);
-			for(u32 j = 0; j < update_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j + 0 * update_count] = (VkDescriptorBufferInfo)
-				{
-					.buffer = update_globals[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-			}
-			for(u32 j = 0; j < update_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j + 1 * update_count] = (VkDescriptorBufferInfo)
-				{
-					.buffer = update_target_buffers[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-			}
-			for(u32 j = 0; j < update_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j + 2 * update_count] = (VkDescriptorBufferInfo)
-				{
-					.buffer = update_scratch_buffers[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-			}
-			for(u32 j = 0; j < update_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j + 3 * update_count] = (VkDescriptorBufferInfo)
-				{
-					.buffer = update_counter_buffers[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-			}
-			for(u32 j = 0; j < update_count; j++)
-			{
-				u32 k = pingpong[i][j];
-				buffers[j + 4 * update_count] = (VkDescriptorBufferInfo)
-				{
-					.buffer = update_offset_buffers[k].handle,
-					.range = VK_WHOLE_SIZE,
-				};
-			}
-			writes[i * update_binding_count + 0] = (VkWriteDescriptorSet)
-			{
+			uniform_buffer_infos[i] = (VkDescriptorBufferInfo){
+				.buffer = update_globals[i].handle,
+				.offset = 0,
+				.range = VK_WHOLE_SIZE,
+			};
+			storage_buffer_infos[i] = (VkDescriptorBufferInfo){
+				.buffer = update_buffer.handle,
+				.offset = 0,
+				.range = VK_WHOLE_SIZE,
+			};
+			writes[i * 2] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 0,
-				.descriptorCount = 2,
 				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.pBufferInfo = buffers,
+				.dstBinding = 0,
+				.descriptorCount = 1,
+				.pBufferInfo = &uniform_buffer_infos[i],
 			};
-			writes[i * update_binding_count + 1] = (VkWriteDescriptorSet)
-			{
+			writes[i * 2 + 1] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
 				.dstBinding = 1,
-				.descriptorCount = 2,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.pBufferInfo = buffers + 1 * update_count,
-			};
-			writes[i * update_binding_count + 2] = (VkWriteDescriptorSet)
-			{
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 1,
-				.descriptorCount = 2,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.pBufferInfo = buffers + 2 * update_count,
-			};
-			writes[i * update_binding_count + 3] = (VkWriteDescriptorSet)
-			{
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 1,
-				.descriptorCount = 2,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.pBufferInfo = buffers + 3 * update_count,
-			};
-			writes[i * update_binding_count + 4] = (VkWriteDescriptorSet)
-			{
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 1,
-				.descriptorCount = 2,
-				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-				.pBufferInfo = buffers + 4 * update_count,
+				.descriptorCount = 1,
+				.pBufferInfo = &storage_buffer_infos[i],
 			};
 		}
-
-		vkUpdateDescriptorSets(device->handle, update_count * update_binding_count, writes,0,0);
-		regress_scratch(scratch);
+		vkUpdateDescriptorSets(device->handle, write_count, writes, 0,0);
 	}
+
 
 	GraphicsQueryPool query_pools[frame_count];
 	for(u32 i = 0; i < frame_count; i++)
 	{
 		query_pools[i] = create_graphics_query_pool(main_arena, device, VK_QUERY_TYPE_TIMESTAMP, 1024, 0);
 	}
-
-
 
 
 
@@ -459,9 +354,9 @@ s32 run_unified(void)
 			swapchain = recreate_graphics_swapchain(resize_arena, swapchain);
 			for(u32 i = 0; i < frame_count; i++)
 			{
-				render_target_images[i] = resize_graphics_device_image(render_target_images[i], u32x2_div1(swapchain.size, 10));
+				render_target_images[i] = resize_graphics_device_image(render_target_images[i], u32x2_div1(swapchain.size, 1));
 			}
-			update_pingpong_descriptor_target_images(render_descriptor_pool, 1, render_target_images);
+			update_descriptor_target_images(render_descriptor_pool, 1, render_target_images);
 
 
 			destroy_graphics_semaphore(swapchain_semaphores[frame_index]);
@@ -477,7 +372,11 @@ s32 run_unified(void)
 
 		GraphicsDeviceImage swapchain_image = swapchain.images[swapchain.image_index];
 		update_camera(&camera, pe, window->size, false);
+		wait_for_graphics_fences(frame_count, render_fences);
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
+
+		print("%t\n", TIME_CALL(particle_test_1(particle_count, (u32*)update_buffer.memory.mapping, pe.r.pressed || (update_accum == 0))));
+		flush_graphics_device_memory(update_buffer.memory);
 
 
 		
@@ -495,6 +394,17 @@ s32 run_unified(void)
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 		cmd_reset_graphics_query_pool(cb, query_pools[frame_index]);
+
+		{
+			GraphicsBufferMemoryBarrier buffer_barrier = {
+				.buffer = update_buffer,	
+				.offset = 0,
+				.size = update_buffer.size,
+				.src_access = VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT,
+				.dst_access = VK_ACCESS_SHADER_READ_BIT,
+			};
+			cmd_graphics_pipeline_buffer_barrier(cb, 1, &buffer_barrier, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+		}
 
 
 		if((frame_accum - resize_frame_accum < swapchain.image_count))
@@ -515,11 +425,27 @@ s32 run_unified(void)
 				.image = render_target_images[frame_index],
 				.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
 				.src_access = VK_ACCESS_NONE,
-				.dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+				.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
 				.old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-				.new_layout = VK_IMAGE_LAYOUT_GENERAL,
+				.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			};
 			cmd_graphics_pipeline_image_barrier(cb, 1, &barrier, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		}
+
+		cmd_clear_graphics_device_image(cb, render_target_images[frame_index], f32x4_set1(0.0));
+
+		{
+			GraphicsImageMemoryBarrier image_barriers[1] = {
+				{
+					.image = render_target_images[frame_index],
+					.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
+					.src_access = VK_ACCESS_TRANSFER_WRITE_BIT,
+					.dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					.old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					.new_layout = VK_IMAGE_LAYOUT_GENERAL,
+				},
+			};
+			cmd_graphics_pipeline_image_barrier(cb, Arrlen(image_barriers), image_barriers, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		}
 
 		update_index = update_accum & 1;
@@ -542,28 +468,22 @@ s32 run_unified(void)
 		*(UpdateGlobals*)(update_globals[update_index].memory.mapping) = (UpdateGlobals)
 		{
 			.update_accum = (u32)update_accum,
-			.particle_count = target_buffer_count,
+			.particle_count = particle_count,
 		};
+
+		
 
 		
 
 		// Reset
 		if(pe.r.pressed || (frame_accum == 0))
 		{
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("RESET"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			u32 dispatch_size = target_buffer_count / (wave_size * resets_per_thread);
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, reset_pipeline);
-			vkCmdDispatch(cb.handle, dispatch_size, 1,1);
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("RESET"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		// Count
 		cmd_general_compute_memory_barrier(cb);
 		{
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("COUNT"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			u32 dispatch_size = target_buffer_count / (wave_size * counts_per_thread);
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, count_pipeline);
-			vkCmdDispatch(cb.handle, dispatch_size, 1,1);
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("COUNT"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		// Prefix 
 		cmd_general_compute_memory_barrier(cb);
@@ -576,7 +496,13 @@ s32 run_unified(void)
 		// Resolve
 		cmd_general_compute_memory_barrier(cb);
 		{
+			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, resolve_pipeline);
+			vkCmdDispatch(cb.handle, particle_count / 32, 1,1);
 		}
+
+
+
+
 		cmd_general_compute_memory_barrier(cb);
 		// Draw
 		{
@@ -588,7 +514,7 @@ s32 run_unified(void)
 
 			*(RenderGlobals*)(render_globals[frame_index].memory.mapping) = (RenderGlobals)
 			{
-				.world_affine = f32m3_padding(camera.current_affine),
+				.world_affine = f32m3_padding(camera.inverse_current_affine),
 				.overlay_affine = f32m3_padding(fixed_camera.affine),
 				.world_zoom = camera.current_zoom,
 				.overlay_zoom = 1.0,
@@ -596,8 +522,10 @@ s32 run_unified(void)
 
 			};
 
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("DRAW"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, draw_pipeline);
 			vkCmdDispatch(cb.handle, dispatch_size.x, dispatch_size.y,1);
+			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("DRAW"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		cmd_general_compute_memory_barrier(cb);
 
@@ -639,13 +567,14 @@ s32 run_unified(void)
 					.image = render_target_images[frame_index],
 					.subresource_range = {VK_IMAGE_ASPECT_COLOR_BIT, 0,1,0,1},
 					.src_access = VK_ACCESS_TRANSFER_READ_BIT,
-					.dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+					.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT,
 					.old_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					.new_layout = VK_IMAGE_LAYOUT_GENERAL,
+					.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				},
 			};
-			cmd_graphics_pipeline_image_barrier(cb, Arrlen(image_barriers), image_barriers, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+			cmd_graphics_pipeline_image_barrier(cb, Arrlen(image_barriers), image_barriers, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		}
+
 
 		end_graphics_command_buffer(cb);
 		
@@ -669,7 +598,7 @@ s32 run_unified(void)
 
 	for(u32 i = 0; i < frame_count; i++)
 	{
-		destroy_graphics_query_pool(query_pools[frame_index]);
+		destroy_graphics_query_pool(query_pools[i]);
 	}
 
 	vkDestroyPipeline(device->handle, reset_pipeline, vkb);;
@@ -695,12 +624,8 @@ s32 run_unified(void)
 	for(u32 i = 0; i < update_count; i++)
 	{
 		destroy_graphics_device_buffer(update_globals[i]);
-		destroy_graphics_device_buffer(update_target_buffers[i]);
-		destroy_graphics_device_buffer(update_scratch_buffers[i]);
-		destroy_graphics_device_buffer(update_counter_buffers[i]);
-		destroy_graphics_device_buffer(update_offset_buffers[i]);
 	}
-
+	destroy_graphics_device_buffer(update_buffer);
 
 	destroy_graphics_semaphores(frame_count, swapchain_semaphores);
 	destroy_graphics_semaphores(frame_count, render_semaphores);

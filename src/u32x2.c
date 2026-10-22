@@ -160,3 +160,17 @@ b32 u32x2_equal(u32x2 a, u32x2 b)
 {
 	return (a.x == b.x) && (a.y == b.y);
 }
+
+u32x2 u32x2_rsh1(u32x2 a, u32 sh)
+{
+	a.x = a.x >> sh;
+	a.y = a.y >> sh;
+	return a;
+}
+
+u32x2 u32x2_lsh1(u32x2 a, u32 sh)
+{
+	a.x <<= sh;
+	a.y <<= sh;
+	return a;
+}

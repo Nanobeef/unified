@@ -44,7 +44,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 	GraphicsInstance *instance = arena_push(arena, 0, sizeof(GraphicsInstance));
 		VkApplicationInfo appinfo = {
 			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-			.apiVersion = VK_API_VERSION_1_4,
+			.apiVersion = VK_API_VERSION_1_0,
 		};
 
 		const char *layers[] = {
@@ -57,7 +57,7 @@ GraphicsInstance *create_graphics_instance(Arena *arena)
 		};
 
 		VkValidationFeatureEnableEXT enabled_validation[] = {
-			VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
+			//VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT,
 			VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
 		};
 		VkValidationFeatureDisableEXT disabled_validation[] = {

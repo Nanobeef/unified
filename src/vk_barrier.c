@@ -26,7 +26,8 @@ void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBar
 			.offset = bmb.offset,
 			.size = bmb.size,
 		};
-	} arena_push_name(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers); for(u32 i = 0; i < barrier.image_memory_barrier_count; i++) {
+	} 
+	arena_push_name(scratch.arena, 0, barrier.image_memory_barrier_count, VkImageMemoryBarrier, image_memory_barriers); for(u32 i = 0; i < barrier.image_memory_barrier_count; i++) {
 		GraphicsImageMemoryBarrier imb = barrier.image_memory_barriers[i];
 		VkImageSubresourceRange subresource_range = imb.subresource_range;
 		if(subresource_range.aspectMask == 0)
@@ -46,6 +47,8 @@ void cmd_graphics_pipeline_barrier(GraphicsCommandBuffer cb, GraphicsPipelineBar
 		};
 	}
 
+
+
 	vkCmdPipelineBarrier(
 		cb.handle, barrier.src_stage, barrier.dst_stage, barrier.dependency_flags, 
 		barrier.memory_barrier_count, memory_barriers,
@@ -60,6 +63,17 @@ void cmd_graphics_pipeline_image_barrier(GraphicsCommandBuffer cb, u32 image_mem
 	GraphicsPipelineBarrier barrier = {
 		.image_memory_barrier_count = image_memory_barrier_count,
 		.image_memory_barriers = image_barriers,
+		.src_stage = src_stage,
+		.dst_stage = dst_stage,
+	};
+	cmd_graphics_pipeline_barrier(cb, barrier);
+}
+
+void cmd_graphics_pipeline_buffer_barrier(GraphicsCommandBuffer cb, u32 buffer_memory_barrier_count,  GraphicsBufferMemoryBarrier *buffer_barriers, VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage)
+{
+	GraphicsPipelineBarrier barrier = {
+		.buffer_memory_barrier_count = buffer_memory_barrier_count,
+		.buffer_memory_barriers = buffer_barriers,
 		.src_stage = src_stage,
 		.dst_stage = dst_stage,
 	};

@@ -136,6 +136,19 @@ s32x2 s32x2_perp_ccw(s32x2 v)
 }
 
 
+s32x2 s32x2_rsh1(s32x2 a, u32 sh)
+{
+	a.x = a.x >> sh;
+	a.y = a.y >> sh;
+	return a;
+}
+
+s32x2 s32x2_lsh1(s32x2 a, u32 sh)
+{
+	a.x <<= sh;
+	a.y <<= sh;
+	return a;
+}
 
 
 

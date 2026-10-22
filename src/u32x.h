@@ -28,6 +28,8 @@ u32 u32x2_length(u32x2 v);
 u32x2 u32x2_unit(u32x2 v);
 u32 u32x2_distance(u32x2 v0, u32x2 v1);
 b32 u32x2_equal(u32x2 a, u32x2 b);
+u32x2 u32x2_rsh1(u32x2 a, u32 sh);
+u32x2 u32x2_lsh1(u32x2 a, u32 sh);
 
 
 typedef union{
