@@ -4,9 +4,11 @@
 typedef struct{
 	u32x2 pos;
 	s32x2 vel;
+	u32 dst_index;
+	u32 empty;
 }Particle1;
 
-const u32 particle_test1_grid_square_size = 64;
+const u32 particle_test1_grid_square_size = 4096;
 
 u64 particle_test1_buffer_size(u32 particle_count)
 {
@@ -17,9 +19,9 @@ void particle_test_1(u32 particle_count, u32* buffer, b32 should_init)
 {
 	u32 grid_square_size = particle_test1_grid_square_size;
 	u32 grid_count = grid_square_size * grid_square_size;
-	u32 grid_rsh = 32 - 6;
+	u32 grid_rsh = 32 - 12;
 
-	RomuQuad rq = romu_quad_seed(10233056121);
+	RomuQuad rq = romu_quad_seed(100021);
 	Particle1 *particles = (void*)buffer;	
 	u32 *counters = (void*)(particles + particle_count);
 	u32 *offsets = (void*)(counters + grid_count);
@@ -33,9 +35,11 @@ void particle_test_1(u32 particle_count, u32* buffer, b32 should_init)
 			memcpy(particles + i, &r, 8);
 			r = romu_quad(&rq);
 			memcpy((u8*)(particles + i) + 8, &r, 8);
-			particles[i].vel = s32x2_rsh1(particles[i].vel, 12);
+			particles[i].vel = s32x2_rsh1(particles[i].vel, 14);
 		}
 	}
+
+	print("init\n");
 
 
 	for(u32 i = 0; i < particle_count; i++)
@@ -55,11 +59,13 @@ void particle_test_1(u32 particle_count, u32* buffer, b32 should_init)
 	{
 		counters[i] = 0;
 	}
+	print("zero\n");
 
 	for(u32 i = 0; i < particle_count; i++)
 	{
 		u32x2 shp = u32x2_rsh1(particles[i].pos, grid_rsh);	
-		u32 index = (shp.y * 64) + shp.x;
+		u32 index = (shp.y * particle_test1_grid_square_size) + shp.x;
+		particles[i].dst_index = counters[index];
 		counters[index]++;
 	}
 
@@ -68,18 +74,29 @@ void particle_test_1(u32 particle_count, u32* buffer, b32 should_init)
 	{
 		offsets[i] = accum;
 		accum += counters[i];
-		counters[i] = 0;
 	}
 
-	Particle1 particle = particles[0];
+
 	for(u32 i = 0; i < particle_count; i++)
 	{
-		u32x2 shp = u32x2_rsh1(particle.pos, grid_rsh);	
-		u32 index = (shp.y * 64) + shp.x;
-		u32 slot = offsets[index] + counters[index];
-		counters[index]++;
-		Particle1 temp = particles[slot];
-		particles[slot] = particle;
-		particle = temp;
+		u32 j = i;
+		while(true)
+		{
+
+			u32x2 shp = u32x2_rsh1(particles[j].pos, grid_rsh);	
+			u32 index = (shp.y * particle_test1_grid_square_size) + shp.x;
+			u32 slot = offsets[index] + particles[j].dst_index;
+			if(j != slot)
+			{
+				Particle1 temp = particles[slot];
+				particles[slot] = particles[j];
+				particles[j] = temp;
+			}
+			else
+			{
+				break;
+			}
+		}
 	}
+
 }

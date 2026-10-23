@@ -18,6 +18,7 @@ typedef struct{
 	f32 overlay_zoom;
 
 	u32 frame_accum;
+	u32 show_circles;
 }RenderGlobals;
 
 void cmd_general_compute_memory_barrier(GraphicsCommandBuffer cb)
@@ -130,10 +131,45 @@ s32 run_unified(void)
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, render_globals);
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceImage, render_target_images);
 
-	u32 particle_count = 1024 * 10;
+	u32 particle_count = 1024 * 1024 * 128;
 	u64 update_buffer_size = particle_test1_buffer_size(particle_count);
 
 	GraphicsDeviceBuffer update_buffer = create_graphics_device_buffer(device->host_cached_heap,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+	particle_test_1(particle_count, (u32*)update_buffer.memory.mapping,true);
+	flush_graphics_device_memory(update_buffer.memory);
+	GraphicsDeviceBuffer temp_buffer = create_graphics_device_buffer(device->device_heap ,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+	if(1){
+		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
+		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
+		
+
+		VkBufferCopy region = {
+			.size = update_buffer_size,
+		};
+		
+		vkCmdCopyBuffer(cb.handle, update_buffer.handle, temp_buffer.handle, 1, &region);
+
+
+		end_graphics_command_buffer(cb);
+		reset_graphics_fence(render_fences[frame_index]);
+		submit_command_buffers(
+			render_queue,
+			0, 0,
+			0, 0,
+			1, &cb, 
+			0,
+			render_fences[frame_index]
+		);
+	}
+
+	wait_for_graphics_fence(render_fences[frame_index]);
+	update_buffer = temp_buffer;
+
+
+
+
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, update_globals);
 	for(u32 i = 0; i < frame_count; i++)
 	{
@@ -198,21 +234,6 @@ s32 run_unified(void)
 	VkPipeline draw_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
 
 
-	if(0){
-		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
-		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
-
-		end_graphics_command_buffer(cb);
-		reset_graphics_fence(render_fences[frame_index]);
-		submit_command_buffers(
-			render_queue,
-			0, 0,
-			0, 0,
-			1, &cb, 
-			0,
-			render_fences[frame_index]
-		);
-	}
 	{
 		u32 write_count = frame_count * 2;
 		VkWriteDescriptorSet writes[write_count];
@@ -375,16 +396,14 @@ s32 run_unified(void)
 		wait_for_graphics_fences(frame_count, render_fences);
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
 
-		print("%t\n", TIME_CALL(particle_test_1(particle_count, (u32*)update_buffer.memory.mapping, pe.r.pressed || (update_accum == 0))));
-		flush_graphics_device_memory(update_buffer.memory);
 
 
 		
-		if(pe.a.pressed){
+		if(pe.a.pressed || true){
 			TimestampQueryResult *qr = get_graphics_timestamp_query_pool_results(frame_arena, query_pools[frame_index]);
 			for(u32 i = 0; i < TOTAL(qr); i++)
 			{
-				print("%s, %t\n", qr[i].name, qr[i].elapsed);
+				print("%s, %tus\n", qr[i].name, qr[i].elapsed);
 			}
 
 		}
@@ -519,6 +538,7 @@ s32 run_unified(void)
 				.world_zoom = camera.current_zoom,
 				.overlay_zoom = 1.0,
 				.frame_accum = (u32)frame_accum,
+				.show_circles = !pe.d.pressed,
 
 			};
 
