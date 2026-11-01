@@ -9,6 +9,8 @@ typedef struct{
 	u32 particle_count;
 
 	u32 update_accum;
+
+
 }UpdateGlobals;
 
 typedef struct{
@@ -19,6 +21,8 @@ typedef struct{
 
 	u32 frame_accum;
 	u32 show_circles;
+	u32 image_x;
+	u32 image_y;
 }RenderGlobals;
 
 void cmd_general_compute_memory_barrier(GraphicsCommandBuffer cb)
@@ -131,16 +135,17 @@ s32 run_unified(void)
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceBuffer, render_globals);
 	arena_push_name(main_arena, 0, frame_count, GraphicsDeviceImage, render_target_images);
 
-	u32 particle_count = 1024 * 1024 * 128;
+	u32 particle_count = 1024 * 102;
 	u64 update_buffer_size = particle_test1_buffer_size(particle_count);
 
 	GraphicsDeviceBuffer update_buffer = create_graphics_device_buffer(device->host_cached_heap,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-	particle_test_1(particle_count, (u32*)update_buffer.memory.mapping,true);
-	flush_graphics_device_memory(update_buffer.memory);
-	GraphicsDeviceBuffer temp_buffer = create_graphics_device_buffer(device->device_heap ,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-	if(1){
+	if(0){
+		particle_test_1(particle_count, (u32*)update_buffer.memory.mapping,true);
+		flush_graphics_device_memory(update_buffer.memory);
+		GraphicsDeviceBuffer temp_buffer = create_graphics_device_buffer(device->device_heap ,update_buffer_size , VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
 		GraphicsCommandPool *command_pool = reset_graphics_command_pool(render_command_pools[frame_index], false);
 		GraphicsCommandBuffer cb = begin_graphics_command_buffer(command_pool->command_buffers[0]);
 		
@@ -162,10 +167,10 @@ s32 run_unified(void)
 			0,
 			render_fences[frame_index]
 		);
+		wait_for_graphics_fence(render_fences[frame_index]);
+		update_buffer = temp_buffer;
 	}
 
-	wait_for_graphics_fence(render_fences[frame_index]);
-	update_buffer = temp_buffer;
 
 
 
@@ -192,7 +197,9 @@ s32 run_unified(void)
 	{
 		VkDescriptorSetLayoutBinding bindings[] = {
 			{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
-			{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
+			{3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, 0},
 		};
 		update_descriptor_set_layout = create_graphics_descriptor_set_layout(device, Arrlen(bindings), bindings);
 	}
@@ -226,13 +233,15 @@ s32 run_unified(void)
 		update_descriptor_pool = create_graphics_descriptor_pool(main_arena, device, frame_count, set_layouts);
 	}
 
-	VkPipeline reset_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/reset.spv");
-	VkPipeline count_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/count.spv");
-	VkPipeline prefix_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/prefix.spv");
-	VkPipeline fill_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/fill.spv");
-	VkPipeline resolve_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/resolve.spv");
-	VkPipeline draw_pipeline = create_compute_pipeline_from_file(device, pipeline_layout, "build/draw.spv");
 
+	UnifiedPipelineSpecialization unified_specialization = {
+ 		.const_timestamp_period = 10,
+ 		.const_buffer_count = 2,
+ 		.const_buffer_granularity = (u32)MiB(64),
+	};
+	
+	VkShaderModule unified_shader_module = read_shader_file(device, "build/unified.spv");
+	UnifiedPipelines unified_pipelines = compile_unified_pipelines(device, unified_shader_module, pipeline_layout, unified_specialization);
 
 	{
 		u32 write_count = frame_count * 2;
@@ -272,13 +281,19 @@ s32 run_unified(void)
 
 
 	{
-		u32 write_count = update_count * 2;
+		u32 write_count = update_count * 4;
 		VkWriteDescriptorSet writes[write_count];
 		VkDescriptorBufferInfo uniform_buffer_infos[2];
+		VkDescriptorBufferInfo uniform_table_buffer_infos[2];
 		VkDescriptorBufferInfo storage_buffer_infos[2];
 		for(u32 i = 0; i < update_count; i++)
 		{
 			uniform_buffer_infos[i] = (VkDescriptorBufferInfo){
+				.buffer = update_globals[i].handle,
+				.offset = 0,
+				.range = VK_WHOLE_SIZE,
+			};
+			uniform_table_buffer_infos[i] = (VkDescriptorBufferInfo){
 				.buffer = update_globals[i].handle,
 				.offset = 0,
 				.range = VK_WHOLE_SIZE,
@@ -288,7 +303,7 @@ s32 run_unified(void)
 				.offset = 0,
 				.range = VK_WHOLE_SIZE,
 			};
-			writes[i * 2] = (VkWriteDescriptorSet){
+			writes[i * 4] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
 				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -296,11 +311,27 @@ s32 run_unified(void)
 				.descriptorCount = 1,
 				.pBufferInfo = &uniform_buffer_infos[i],
 			};
-			writes[i * 2 + 1] = (VkWriteDescriptorSet){
+			writes[i * 4 + 1] = (VkWriteDescriptorSet){
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
+				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.dstBinding = 1,
+				.descriptorCount = 1,
+				.pBufferInfo = &uniform_table_buffer_infos[i],
+			};
+			writes[i * 4 + 2] = (VkWriteDescriptorSet){
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
-				.dstBinding = 1,
+				.dstBinding = 2,
+				.descriptorCount = 1,
+				.pBufferInfo = &storage_buffer_infos[i],
+			};
+			writes[i * 4 + 3] = (VkWriteDescriptorSet){
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+				.dstSet = update_descriptor_pool->descriptor_sets[i].handle,
+				.dstBinding = 3,
 				.descriptorCount = 1,
 				.pBufferInfo = &storage_buffer_infos[i],
 			};
@@ -396,16 +427,13 @@ s32 run_unified(void)
 		wait_for_graphics_fences(frame_count, render_fences);
 		wait_and_reset_graphics_fence(render_fences[frame_index]);
 
-
-
 		
-		if(pe.a.pressed || true){
+		if(pe.a.pressed ){
 			TimestampQueryResult *qr = get_graphics_timestamp_query_pool_results(frame_arena, query_pools[frame_index]);
 			for(u32 i = 0; i < TOTAL(qr); i++)
 			{
-				print("%s, %tus\n", qr[i].name, qr[i].elapsed);
+				print("%s, %t\n", qr[i].name, qr[i].elapsed);
 			}
-
 		}
 
 
@@ -492,17 +520,14 @@ s32 run_unified(void)
 
 		
 
-		
-
 		// Reset
 		if(pe.r.pressed || (frame_accum == 0))
 		{
-			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, reset_pipeline);
+		//	vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, unified_pipelines.reset);
 		}
 		// Count
 		cmd_general_compute_memory_barrier(cb);
 		{
-			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, count_pipeline);
 		}
 		// Prefix 
 		cmd_general_compute_memory_barrier(cb);
@@ -515,21 +540,25 @@ s32 run_unified(void)
 		// Resolve
 		cmd_general_compute_memory_barrier(cb);
 		{
-			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, resolve_pipeline);
-			vkCmdDispatch(cb.handle, particle_count / 32, 1,1);
 		}
 
 
 
+		cmd_general_compute_memory_barrier(cb);
+
+		cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("Small Simulate"),  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, unified_pipelines.small_simulate);
+		vkCmdDispatch(cb.handle, 1,1,1);
+		cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("Small Simulate"),  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
 		cmd_general_compute_memory_barrier(cb);
-		// Draw
-		{
-			u32x2 dispatch_size = u32x2_set(
-				(target_size.x / 8) + ((target_size.x % 8) != 0),
-				(target_size.y / 4) + ((target_size.y % 4) != 0)
-			);
 
+		cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("Small Draw"),  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+		vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, unified_pipelines.small_draw);
+		vkCmdDispatch(cb.handle, 1,1,1);
+		cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("Small Draw"),  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+		{
 
 			*(RenderGlobals*)(render_globals[frame_index].memory.mapping) = (RenderGlobals)
 			{
@@ -542,10 +571,6 @@ s32 run_unified(void)
 
 			};
 
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("DRAW"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-			vkCmdBindPipeline(cb.handle, VK_PIPELINE_BIND_POINT_COMPUTE, draw_pipeline);
-			vkCmdDispatch(cb.handle, dispatch_size.x, dispatch_size.y,1);
-			cmd_timestamp_graphics_query_name(cb, query_pools[frame_index], str8_lit("DRAW"), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
 		}
 		cmd_general_compute_memory_barrier(cb);
 
@@ -595,7 +620,6 @@ s32 run_unified(void)
 			cmd_graphics_pipeline_image_barrier(cb, Arrlen(image_barriers), image_barriers, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 		}
 
-
 		end_graphics_command_buffer(cb);
 		
 		submit_command_buffers(
@@ -621,12 +645,7 @@ s32 run_unified(void)
 		destroy_graphics_query_pool(query_pools[i]);
 	}
 
-	vkDestroyPipeline(device->handle, reset_pipeline, vkb);;
-	vkDestroyPipeline(device->handle, count_pipeline, vkb);;
-	vkDestroyPipeline(device->handle, prefix_pipeline, vkb);;
-	vkDestroyPipeline(device->handle, fill_pipeline, vkb);;
-	vkDestroyPipeline(device->handle, resolve_pipeline, vkb);;
-	vkDestroyPipeline(device->handle, draw_pipeline, vkb);;
+	destroy_unified_pipelines(unified_pipelines);
 	destroy_graphics_descriptor_pool(render_descriptor_pool);
 	destroy_graphics_descriptor_set_layout(render_descriptor_set_layout);
 

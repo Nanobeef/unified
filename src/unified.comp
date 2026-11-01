@@ -3,24 +3,43 @@
 
 #include "unified_comp.h"
 
-
-// Implicit entrypoint macros 
-/*
-		
-*/
-
-
-// When I was reasoning through the prefix-sum algorithm, there was a specific reason to use u16x2 rather than u32 when accumulating the counters in shared memory 4096*4 (16KiB). I forget why.
-
-
-
+layout(constant_id = 0) const u32 const_pipeline_id = 0;
 layout(constant_id = 1) const u32 const_timestamp_period = 10;
-layout(constant_id = 2) const u32 const_particle_stride = 6;
-layout(constant_id = 3) const u32 const_grid_square_size = 4096;
-u64 get_time_ns() {return clockRealtimeEXT() * const_timestamp_period;}
+layout(constant_id = 2) const u32 const_buffer_count = 4096;
+layout(constant_id = 3) const u32 const_buffer_granularity = (1024 * 1024);
+
+#if 1
+	#extension GL_EXT_debug_printf : enable
+	#extension GL_EXT_shader_realtime_clock : enable
+	#extension GL_EXT_shader_explicit_arithmetic_types : enable
+	#define u64 uint64_t
+	u64 get_time_ns() {return clockRealtimeEXT() * const_timestamp_period;}
+#endif
 
 
-// Per Render Descriptors
+
+
+layout(local_size_x = 64) in;
+
+void small_simulate();
+void small_draw();
+
+void main()
+{
+	switch(const_pipeline_id)
+	{
+		case 0: small_simulate(); break;
+		case 1: small_draw(); break;
+	}
+}
+
+u32 load_number(u32x2 offset)
+{
+	return 0;		
+}
+
+
+
 layout(set = 0, binding = 0, std140) uniform RenderGlobals{
 	mat3x3 world_affine;
 	mat3x3 overlay_affine;
@@ -33,8 +52,6 @@ layout(set = 0, binding = 0, std140) uniform RenderGlobals{
 
 layout(set = 0, binding = 1) writeonly uniform image2D target_image;
 
-
-// Per Update Descriptors
 layout(set = 1, binding = 0, std140) uniform UpdateGlobals{
 	u32 particles_pointer;
 	u32 grid_offsets_pointer;
@@ -42,116 +59,79 @@ layout(set = 1, binding = 0, std140) uniform UpdateGlobals{
 	u32 particle_count;
 
 	u32 update_accum;
+
+	u32 buffer_granularity;
+	u32 buffer_rsh;
 }update_globals;
 
-layout(set = 1, binding = 1) readonly buffer ReadBuffer{
+layout(set = 1, binding = 1, std140) uniform StorageBufferTable{
+	u32 indices[16384];
+}storage_buffer_table;
+
+layout(set = 1, binding = 2) readonly buffer ReadBuffer{
 	uint data[];
 }read_buffer;
 
-layout(set = 1, binding = 2) writeonly buffer WriteBuffer{
+layout(set = 1, binding = 3) writeonly buffer WriteBuffer{
 	uint data[];
 }write_buffer;
 
-#ifdef RESET
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-void main()
+
+void small_simulate()
 {
+	u32 tid = gl_LocalInvocationID.x;
+	u32 rs = tid;
+	u32x2 target_size = imageSize(target_image);
+	write_buffer.data[tid] = splitmix32(rs) % target_size.x;
+	write_buffer.data[tid+64] = splitmix32(rs) % target_size.y;
 }
 
-#endif
-
-#ifdef COUNT 
-#define WAVE_SIZE 32
-layout(local_size_x = WAVE_SIZE, local_size_y = 1, local_size_z = 1) in;
-
-
-void main()
+f32x4 u32_to_color(u32 data)
 {
+	u32 r = (data & 0x000000FF) >> 0;
+	u32 g = (data & 0x0000FF00) >> 8;
+	u32 b = (data & 0x00FF0000) >> 16;
+	u32 a = (data & 0xFF000000) >> 24;
+	f32x4 ret = f32x4(r,g,b,a);
+	ret /= 256.0;
+	return ret;
 }
-#endif // COUNT 
 
-#ifdef PREFIX
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-void main()
+void small_draw()
 {
-}
-#endif // PREFIX 
-
-#ifdef FILL
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-void main()
-{
-}
-#endif // FILL 
-
-#ifdef RESOLVE 
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-void main()
-{
-	
-}
-#endif // RESOLVE 
-
-
-#ifdef DRAW
-layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
-void main()
-{
-
-
-	u32x2 pixel = gl_GlobalInvocationID.xy;
-	u32x2 image_size = imageSize(target_image);
-	vec2 pos = (vec2(pixel) / vec2(image_size) - 0.5) * 2.0;
-
-
-
-	if((pixel.x > image_size.x) || (pixel.y > image_size.y))
-		return;
-
-
-	f32x2 world_pos = (vec3(pos, 1.0) * render_globals.world_affine).xy;
-
-	if(world_pos.x < 1.0 && world_pos.x > -1.0 && world_pos.y < 1.0 && world_pos.y > -1.0)
+	u32 tid_w = 8;
+	u32 tid_h = 8;
+	u32 tid = gl_LocalInvocationID.x;
+	u32x2 tid2 = u32x2(tid % 8, tid / 8);
+	u32x2 target_size = imageSize(target_image);
+	u32x2 grid_count = target_size / 8 + 1;
+	f32x2 pos = f32x2(read_buffer.data[0], read_buffer.data[64]);
+	for(u32 y = 0; y < grid_count.y; y++)
 	{
-
-		u32x2 upos = u32x2(((world_pos / 2.0) + 0.5) * 4294967296.0);
-		upos.x >>= (32-12);
-		upos.y >>= (32-12);
-		u32 cell_index = (upos.y * const_grid_square_size) + upos.x;
-		u32 counter_offset = 0 + update_globals.particle_count * const_particle_stride;
-		u32 offset_offset = counter_offset + (const_grid_square_size * const_grid_square_size);
-
-		u32 cell_offset = read_buffer.data[offset_offset + cell_index];
-		u32 count = read_buffer.data[counter_offset + cell_index];
-
-		f32x4 color = vec4(f32(count) / 256.0);
-		color.a = 1.0;
-
-		if(render_globals.show_circles != 0)
+		for(u32 x = 0; x < grid_count.x; x++)
 		{
-			f32 cover = 0.0;
-			for(u32 i = 0; i < count; i++)
+			u32x2 pixel = u32x2(x,y) * 8 + tid2;
+			if(pixel.x < target_size.x && pixel.y < target_size.y)
 			{
-				u32 particle_offset = (i + cell_offset) * const_particle_stride;
-				u32x2 uparticle_pos;
-				uparticle_pos.x = read_buffer.data[particle_offset + 0];
-				uparticle_pos.y = read_buffer.data[particle_offset + 1];
-				u32 id = read_buffer.data[particle_offset + 5];
-				f32x2 particle_pos = ((f32x2(uparticle_pos) / 4294967296.0) - 0.5) * 2.0;
-
-				f32 d = distance(world_pos, particle_pos);
-				const f32 edge = 0.00005;
-				const f32 radius = 0.0001;
-				cover = max(cover, smoothstep(radius + edge, radius - edge, d));
+				if(distance(pos, f32x2(pixel)) < 100.0)
+				{
+					u32 rs = pixel.x + pixel.y * target_size.x;
+					u32 r = splitmix32(rs);
+					f32x4 color = u32_to_color(r);
+					imageStore(target_image, s32x2(pixel), color);
+				}
+				else
+				{
+					f32x4 color = f32x4(0.0);
+					imageStore(target_image, s32x2(pixel), color);
+				}
+				
 			}
-			color += cover;
+
 		}
-		imageStore(target_image, s32x2(pixel), color);
 	}
 
 
-
-
-
 }
-#endif // DRAW
+
+

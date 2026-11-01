@@ -8,6 +8,7 @@ VkPipeline create_compute_pipeline_from_file(GraphicsDevice *device, VkPipelineL
 		.stage = VK_SHADER_STAGE_COMPUTE_BIT,
 		.module = module,
 		.pName = "main",
+		.pSpecializationInfo = 0,
 	};
 	VkComputePipelineCreateInfo info = {
 		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,

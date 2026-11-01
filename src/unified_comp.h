@@ -1,81 +1,39 @@
 
 
 
+#define f32 float 
+#define u32 uint 
+#define s32 int 
+#define f32x2 vec2
+#define u32x2 uvec2
+#define s32x2 ivec2
+#define f32x3 vec3
+#define u32x3 uvec3
+#define s32x3 ivec3
+#define f32x4 vec4
+#define u32x4 uvec4
+#define s32x4 ivec4
+#define f32m3 mat3x3
+#define f32m2 mat2x2
 
-#define f16 float16_t
-#define f32 float32_t
-#define f64 float64_t
-
-#define u8 uint8_t
-#define u16 uint16_t
-#define u32 uint32_t
-#define u64 uint64_t
-
-#define s8 int8_t
-#define s16 int16_t
-#define s32 int32_t
-#define s64 int64_t
-
-#define f16x2 f16vec2
-#define f32x2 f32vec2
-#define f64x2 f64vec2
-
-#define u8x2 u8vec2
-#define u16x2 u16vec2
-#define u32x2 u32vec2
-#define u64x2 u64vec2
-
-#define s8x2 i8vec2
-#define s16x2 i16vec2
-#define s32x2 i32vec2
-#define s64x2 i64vec2
-
-#define f16x3 f16vec3
-#define f32x3 f32vec3
-#define f64x3 f64vec3
-
-#define u8x3 u8vec3
-#define u16x3 u16vec3
-#define u32x3 u32vec3
-#define u64x3 u64vec3
-
-#define s8x3 i8vec3
-#define s16x3 i16vec3
-#define s32x3 i32vec3
-#define s64x3 i64vec3
-
-#define f16x4 f16vec4
-#define f32x4 f32vec4
-#define f64x4 f64vec4
-
-#define u8x4 u8vec4
-#define u16x4 u16vec4
-#define u32x4 u32vec4
-#define u64x4 u64vec4
-
-#define s8x4 i8vec4
-#define s16x4 i16vec4
-#define s32x4 i32vec4
-#define s64x4 i64vec4
-
-#define f32m3 f32mat3x3
-#define f32m2 f32mat2x2
-
-#extension GL_EXT_shader_explicit_arithmetic_types : enable
-#extension GL_EXT_debug_printf : enable
-#extension GL_EXT_shader_realtime_clock : enable
+#define KiB(n) ((u32)(n) << 10)
+#define MiB(n) ((u32)(n) << 20)
 
 
-#extension GL_KHR_shader_subgroup_basic : enable
-#extension GL_KHR_shader_subgroup_ballot : enable
-#extension GL_NV_shader_subgroup_partitioned : enable
+/* 
+	Disabled for now, using software to make the basic compatability version version.
+
+	#extension GL_KHR_shader_subgroup_basic : enable
+	#extension GL_KHR_shader_subgroup_ballot : enable
+	#extension GL_NV_shader_subgroup_partitioned : enable
+*/
 
 #define Arrlen(X) (sizeof((X)[0]) / sizeof(X))
 
-uint splitmix32(inout uint state)
+u32 splitmix32(inout u32 state)
 {
 	state += 2654435769u;
-	uint s = state;
+	u32 s = state;
 	s ^= s >> 16;
 	s *= 0x85ebca6b;
 	s ^= s >> 13;
@@ -85,7 +43,7 @@ uint splitmix32(inout uint state)
 }
 
 
-uint lowbias32(uint x) {
+u32 lowbias32(u32 x) {
     x ^= x >> 16u;
     x *= 0x7feb352du;
     x ^= x >> 15u;
@@ -97,9 +55,9 @@ uint lowbias32(uint x) {
 // https://www.romu-random.org
 #define ROMU_ROTL32(d,lrot) ((d<<(lrot)) | (d>>(8*4-(lrot))))
 
-u16 romu_mono(inout u32 state)
+u32 romu_mono(inout u32 state)
 {
-	u16 result = u16(state >> 16);
+	u32 result = (state >> 16);
 	state *= 3611795771u;
 	state = ROMU_ROTL32(state, 12);
 	return result;

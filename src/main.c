@@ -61,6 +61,7 @@ u64 epoch_time_ns;
 	#include "vk_queue.h"
 	#include "vk_descriptor.h"
 	#include "vk_pipeline.h"
+	#include "vk_compute.h"
 	#include "vk_query.h"
 
 // AUDIO 
